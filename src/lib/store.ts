@@ -201,8 +201,27 @@ export async function createItem(collection: CollectionName, data: CollectionInp
       ...data,
       slug,
       status: data.status || 'draft',
+      currency: ('currency' in data && data.currency) ? data.currency : 'TJS',
     } as Prisma.ListingUncheckedCreateInput;
-    baseData.currency = 'TJS';
+    
+    if (baseData.sellerId) {
+      const user = await prisma.user.findUnique({ where: { id: baseData.sellerId } });
+      if (user) {
+        baseData.sellerName = user.name || "Unknown";
+        baseData.sellerPhone = user.phone || "";
+        baseData.sellerWhatsapp = user.whatsapp || "";
+        baseData.sellerAvatar = user.avatar || "";
+        baseData.employeeId = user.id;
+      }
+    } else {
+      baseData.sellerId = "system";
+      baseData.sellerName = "Admin";
+      baseData.sellerPhone = "";
+      baseData.sellerWhatsapp = "";
+      baseData.sellerAvatar = "";
+      baseData.employeeId = "system";
+    }
+
     if (!baseData.id) delete baseData.id;
     return await prisma.listing.create({ data: baseData });
   } else if (collection === 'employees') {
