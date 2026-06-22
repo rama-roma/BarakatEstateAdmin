@@ -1,5 +1,5 @@
-import AdminApp from "@/components/AdminApp";
+import UserDashboard from "@/components/UserDashboard";
 
 export default function Page() {
-  return <AdminApp />;
+  return <UserDashboard />;
 }

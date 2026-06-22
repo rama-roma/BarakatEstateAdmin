@@ -1,5 +1,7 @@
 import { createItem, getPublicPayload, listItems } from "@/lib/store";
 import { isCollection, jsonResponse } from "@/lib/api";
+import { getSession } from "@/lib/auth";
+import { listingSchema } from "@/lib/validations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,7 +25,17 @@ export async function GET(request: Request, context: CollectionContext) {
   const adminMode = url.searchParams.get("admin") === "1";
 
   if (adminMode) {
-    return jsonResponse({ data: await listItems(collection) });
+    const session = await getSession();
+    if (!session) {
+      return jsonResponse({ error: "Не авторизован" }, 401);
+    }
+    // Return all items for the user (store handles this now if we want, or here)
+    const items = await listItems(collection);
+    // If it's listings, only return user's listings unless admin
+    if (collection === "listings" && session.role !== "admin") {
+      return jsonResponse({ data: items.filter((item: any) => item.sellerId === session.userId) });
+    }
+    return jsonResponse({ data: items });
   }
 
   return jsonResponse(await getPublicPayload(collection));
@@ -36,7 +48,22 @@ export async function POST(request: Request, context: CollectionContext) {
     return jsonResponse({ error: "Unknown collection" }, 404);
   }
 
+  const session = await getSession();
+  if (!session) {
+    return jsonResponse({ error: "Не авторизован" }, 401);
+  }
+
   const data = await request.json();
+
+  if (collection === "listings") {
+    const parsed = listingSchema.safeParse(data);
+    if (!parsed.success) {
+      return jsonResponse({ error: "Ошибка валидации", details: parsed.error.format() }, 400);
+    }
+    // Enforce sellerId
+    data.sellerId = session.userId;
+  }
+
   const item = await createItem(collection, data);
   return jsonResponse({ data: item }, 201);
 }

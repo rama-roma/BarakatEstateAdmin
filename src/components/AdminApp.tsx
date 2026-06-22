@@ -23,6 +23,7 @@ type Tab = CollectionName | "profile";
 type FormState = {
   listings: Partial<Listing>;
   employees: Partial<Employee>;
+  services: Partial<ServiceItem>;
   profile: Partial<Profile>;
 };
 
@@ -38,7 +39,7 @@ const emptyForms: FormState = {
     dealType: "sale",
     propertyType: "Квартира",
     price: 0,
-    currency: "USD",
+    currency: "TJS",
     district: "Душанбе",
     address: "",
     rooms: 1,
@@ -77,6 +78,15 @@ const emptyForms: FormState = {
     specializations: "Квартиры, новостройки",
     status: "published",
   },
+  services: {
+    title: "",
+    slug: "",
+    description: "",
+    priceLabel: "",
+    icon: "home",
+    sortOrder: 0,
+    status: "published",
+  },
   profile: {
     name: "Barakat",
     description: "",
@@ -101,9 +111,9 @@ function cloneForm<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function formatMoney(value?: number, currency?: string) {
+function formatMoney(value?: number) {
   const amount = Number(value || 0).toLocaleString("ru-RU").replace(/\u00a0/g, " ");
-  return currency === "TJS" ? `${amount} TJS` : `$${amount}`;
+  return `${amount} сомони`;
 }
 
 function toNumber(value: FormDataEntryValue | null) {
@@ -627,11 +637,10 @@ function buildPayload(tab: Tab, data: FormData, user: AuthUser) {
   if (tab === "listings") {
     return {
       title: String(data.get("title") || ""),
-      slug: String(data.get("slug") || ""),
       dealType: data.get("dealType") === "rent" ? "rent" : "sale",
       propertyType: String(data.get("propertyType") || "Квартира"),
       price: toNumber(data.get("price")),
-      currency: data.get("currency") === "TJS" ? "TJS" : "USD",
+      currency: "TJS",
       district: String(data.get("district") || ""),
       address: String(data.get("address") || ""),
       rooms: toNumber(data.get("rooms")),
@@ -677,7 +686,6 @@ function buildPayload(tab: Tab, data: FormData, user: AuthUser) {
 
   return {
     title: String(data.get("title") || ""),
-    slug: String(data.get("slug") || ""),
     description: String(data.get("description") || ""),
     priceLabel: String(data.get("priceLabel") || ""),
     icon: String(data.get("icon") || "home"),
@@ -727,11 +735,9 @@ function renderForm(tab: Tab, form: FormState) {
       <>
         <div className="form-grid">
           <Field name="title" title="Название" value={item.title} />
-          <Field name="slug" title="Slug" value={item.slug} />
           <Select name="dealType" title="Тип сделки" value={item.dealType} options={[["sale", "Продажа"], ["rent", "Аренда"]]} />
           <Field name="propertyType" title="Тип недвижимости" value={item.propertyType} />
           <Field name="price" title="Цена" type="number" value={item.price} />
-          <Select name="currency" title="Валюта" value={item.currency} options={[["USD", "USD"], ["TJS", "TJS"]]} />
           <Field name="district" title="Район" value={item.district} />
           <Field name="address" title="Адрес" value={item.address} />
           <Field name="rooms" title="Комнаты" type="number" value={item.rooms} />
@@ -794,7 +800,6 @@ function renderForm(tab: Tab, form: FormState) {
     <>
       <div className="form-grid">
         <Field name="title" title="Название" value={item.title} />
-        <Field name="slug" title="Slug" value={item.slug} />
         <Field name="priceLabel" title="Цена" value={item.priceLabel} />
         <Field name="icon" title="Иконка" value={item.icon} />
         <Field name="sortOrder" title="Порядок" type="number" value={item.sortOrder} />
@@ -940,7 +945,7 @@ function renderItemBody(item: Listing | Employee | ServiceItem, employees: Emplo
       <h3>{title || "Без названия"}</h3>
       <p>{subtitle || "Описание не заполнено"}</p>
       <div className="item-meta">
-        {"price" in item ? <span>{formatMoney(item.price, item.currency)}</span> : null}
+        {"price" in item ? <span>{formatMoney(item.price)}</span> : null}
         {"rooms" in item ? <span>{item.rooms} комн.</span> : null}
         {"area" in item ? <span>{item.area} м²</span> : null}
         {sellerName ? <span>{sellerName}</span> : employee ? <span>{employee.fullName}</span> : null}

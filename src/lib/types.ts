@@ -25,7 +25,7 @@ export type Listing = {
   dealType: "sale" | "rent";
   propertyType: string;
   price: number;
-  currency: "USD" | "TJS";
+  currency: "TJS";
   district: string;
   address: string;
   rooms: number;
@@ -85,10 +85,10 @@ export type Profile = {
   specializations: string;
 };
 
-export type AdminUser = {
+export type User = {
   id: string;
   username: string;
-  password: string;
+  password?: string;
   name: string;
   email: string;
   phone: string;
@@ -102,10 +102,10 @@ export type AdminUser = {
   dealsCount: number;
   experienceYears: number;
   specializations: string;
-  role: "seller" | "admin";
+  role: "user" | "seller" | "admin";
 };
 
-export type AuthUser = Omit<AdminUser, "password">;
+export type AuthUser = Omit<User, "password">;
 
 export type CollectionName = "listings" | "employees" | "services";
 

@@ -1,311 +1,278 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import type { AdminUser, AuthUser, CollectionItem, CollectionName, Employee, Listing, Profile, ServiceItem } from "./types";
+import { prisma } from './prisma';
+import bcrypt from 'bcryptjs';
+import type { Prisma } from '@prisma/client';
+import type {
+  User,
+  AuthUser,
+  CollectionName,
+  Employee,
+  Listing,
+  Profile,
+  ServiceItem,
+} from './types';
 
-type CollectionMap = {
-  listings: Listing;
-  employees: Employee;
-  services: ServiceItem;
-};
+type StoredListing = Omit<Listing, 'createdAt' | 'updatedAt'> & { createdAt: Date | string; updatedAt: Date | string };
+type CollectionInput = Partial<Listing> | Partial<Employee> | Partial<ServiceItem>;
 
-const DATA_DIR = path.join(process.cwd(), "data");
-
-const files: Record<CollectionName, string> = {
-  listings: "listings.json",
-  employees: "employees.json",
-  services: "services.json",
-};
-
-const profileFile = "profile.json";
-const usersFile = "users.json";
-
-const defaultProfile: Profile = {
-  name: "Barakat",
-  description: "",
-  phone: "",
-  email: "",
-  socials: {
-    instagram: "",
-    telegram: "",
-    facebook: "",
-    whatsapp: "",
-  },
-  logoUrl: "/barakat.PNG",
-  avatarUrl: "",
-  rating: 5,
-  dealsCount: 0,
-  experienceYears: 1,
-  specializations: "",
-};
-
-function filePath(collection: CollectionName) {
-  return path.join(DATA_DIR, files[collection]);
-}
-
-function profilePath() {
-  return path.join(DATA_DIR, profileFile);
-}
-
-function usersPath() {
-  return path.join(DATA_DIR, usersFile);
-}
-
-function now() {
-  return new Date().toISOString();
+function publicUser(user: User): AuthUser {
+  const safeUser: Partial<User> = { ...user };
+  delete safeUser.password;
+  return safeUser as AuthUser;
 }
 
 function normalizeSlug(value: string, fallback: string) {
   const slug = value
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\u0400-\u04ff]+/gi, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^a-z0-9\u0400-\u04ff]+/gi, '-')
+    .replace(/^-+|-+$/g, '');
 
   return slug || fallback;
 }
 
-function itemSlug(item: CollectionItem) {
-  return "slug" in item ? item.slug : item.id;
-}
-
-function publicUser(user: AdminUser): AuthUser {
-  const safeUser: Partial<AdminUser> = { ...user };
-  delete safeUser.password;
-  return safeUser as AuthUser;
-}
-
-const defaultUsers: AdminUser[] = [
-  {
-    id: "seller-1",
-    username: "seller",
-    password: "barakat123",
-    name: "Рамзия",
-    email: "",
-    phone: "",
-    whatsapp: "",
-    telegram: "",
-    instagram: "",
-    facebook: "",
-    avatar: "",
-    bio: "",
-    rating: 5,
-    dealsCount: 0,
-    experienceYears: 1,
-    specializations: "",
-    role: "seller",
-  },
-];
-
-function normalizeUser(user: AdminUser): AdminUser {
-  return {
-    ...defaultUsers[0],
-    ...user,
-    telegram: user.telegram || "",
-    instagram: user.instagram || "",
-    facebook: user.facebook || "",
-  };
-}
-
-export async function readUsers(): Promise<AdminUser[]> {
-  await mkdir(DATA_DIR, { recursive: true });
-
-  try {
-    const raw = await readFile(usersPath(), "utf8");
-    return (JSON.parse(raw) as AdminUser[]).map(normalizeUser);
-  } catch {
-    await writeFile(usersPath(), `${JSON.stringify(defaultUsers, null, 2)}\n`, "utf8");
-    return defaultUsers;
-  }
+export async function readUsers(): Promise<User[]> {
+  const users = await prisma.user.findMany();
+  return users as User[];
 }
 
 export async function authenticateUser(username: string, password: string) {
-  const users = await readUsers();
-  const user = users.find((item) => item.username === username && item.password === password);
-  return user ? publicUser(user) : null;
+  const user = await prisma.user.findUnique({
+    where: { username },
+  });
+  if (!user) return null;
+
+  const isValid = await bcrypt.compare(password, user.password);
+  if (!isValid) return null;
+
+  return publicUser(user as User);
 }
 
 export async function getPublicSeller(id: string) {
-  const users = await readUsers();
-  const user = users.find((item) => item.id === id);
-  return user ? publicUser(user) : null;
+  const user = await prisma.user.findUnique({
+    where: { id },
+  });
+  return user ? publicUser(user as User) : null;
 }
 
 export async function updateUserProfile(userId: string, data: Partial<AuthUser>) {
-  const users = await readUsers();
-  let updated: AuthUser | null = null;
-  const nextUsers = users.map((user) => {
-    if (user.id !== userId) {
-      return user;
-    }
-
-    const nextUser: AdminUser = {
-      ...user,
-      name: String(data.name || user.name),
-      email: String(data.email || ""),
-      phone: String(data.phone || ""),
-      whatsapp: String(data.whatsapp || ""),
-      telegram: String(data.telegram || ""),
-      instagram: String(data.instagram || ""),
-      facebook: String(data.facebook || ""),
-      avatar: String(data.avatar || ""),
-      bio: String(data.bio || ""),
-      rating: Number(data.rating || user.rating || 5),
-      dealsCount: Number(data.dealsCount || user.dealsCount || 0),
-      experienceYears: Number(data.experienceYears || user.experienceYears || 0),
-      specializations: String(data.specializations || ""),
-    };
-
-    updated = publicUser(nextUser);
-    return nextUser;
-  });
-
-  if (!updated) {
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: data.name !== undefined ? String(data.name) : undefined,
+        email: data.email !== undefined ? String(data.email) : undefined,
+        phone: data.phone !== undefined ? String(data.phone) : undefined,
+        whatsapp: data.whatsapp !== undefined ? String(data.whatsapp) : undefined,
+        telegram: data.telegram !== undefined ? String(data.telegram) : undefined,
+        instagram: data.instagram !== undefined ? String(data.instagram) : undefined,
+        facebook: data.facebook !== undefined ? String(data.facebook) : undefined,
+        avatar: data.avatar !== undefined ? String(data.avatar) : undefined,
+        bio: data.bio !== undefined ? String(data.bio) : undefined,
+        rating: data.rating !== undefined ? Number(data.rating) : undefined,
+        dealsCount: data.dealsCount !== undefined ? Number(data.dealsCount) : undefined,
+        experienceYears: data.experienceYears !== undefined ? Number(data.experienceYears) : undefined,
+        specializations: data.specializations !== undefined ? String(data.specializations) : undefined,
+      },
+    });
+    return publicUser(updated as User);
+  } catch {
     return null;
   }
-
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(usersPath(), `${JSON.stringify(nextUsers, null, 2)}\n`, "utf8");
-  return updated;
 }
 
-export async function readCollection<TName extends CollectionName>(
-  collection: TName,
-): Promise<CollectionMap[TName][]> {
-  await mkdir(DATA_DIR, { recursive: true });
-
-  try {
-    const raw = await readFile(filePath(collection), "utf8");
-    return JSON.parse(raw) as CollectionMap[TName][];
-  } catch {
-    await writeFile(filePath(collection), "[]", "utf8");
-    return [];
-  }
+export async function readCollection(collection: CollectionName): Promise<unknown[]> {
+  if (collection === 'listings') return await prisma.listing.findMany({ orderBy: { createdAt: 'desc' } });
+  if (collection === 'employees') return await prisma.employee.findMany({ orderBy: { createdAt: 'desc' } });
+  if (collection === 'services') return await prisma.serviceItem.findMany({ orderBy: { sortOrder: 'asc' } });
+  return [];
 }
 
 export async function readProfile(): Promise<Profile> {
-  await mkdir(DATA_DIR, { recursive: true });
+  let profile = await prisma.profile.findUnique({
+    where: { id: 'default' },
+  });
 
-  try {
-    const raw = await readFile(profilePath(), "utf8");
-    return { ...defaultProfile, ...JSON.parse(raw) } as Profile;
-  } catch {
-    const profile = { ...defaultProfile };
-    await writeFile(profilePath(), `${JSON.stringify(profile, null, 2)}\n`, "utf8");
-    return profile;
+  if (!profile) {
+    profile = await prisma.profile.create({
+      data: {
+        id: 'default',
+        name: 'Barakat',
+        description: '',
+        phone: '',
+        email: '',
+        instagram: '',
+        telegram: '',
+        facebook: '',
+        whatsapp: '',
+        logoUrl: '/barakat.PNG',
+        avatarUrl: '',
+        rating: 5,
+        dealsCount: 0,
+        experienceYears: 1,
+        specializations: '',
+      },
+    });
   }
+
+  return {
+    name: profile.name,
+    description: profile.description,
+    phone: profile.phone,
+    email: profile.email,
+    socials: {
+      instagram: profile.instagram,
+      telegram: profile.telegram,
+      facebook: profile.facebook,
+      whatsapp: profile.whatsapp,
+    },
+    logoUrl: profile.logoUrl,
+    avatarUrl: profile.avatarUrl,
+    rating: profile.rating,
+    dealsCount: profile.dealsCount,
+    experienceYears: profile.experienceYears,
+    specializations: profile.specializations,
+  };
 }
 
 export async function writeProfile(data: Partial<Profile>): Promise<Profile> {
   const current = await readProfile();
-  const profile: Profile = {
-    ...current,
-    ...data,
-    socials: {
-      ...current.socials,
-      ...(data.socials || {}),
+  
+  const updated = await prisma.profile.update({
+    where: { id: 'default' },
+    data: {
+      name: data.name ?? current.name,
+      description: data.description ?? current.description,
+      phone: data.phone ?? current.phone,
+      email: data.email ?? current.email,
+      instagram: data.socials?.instagram ?? current.socials.instagram,
+      telegram: data.socials?.telegram ?? current.socials.telegram,
+      facebook: data.socials?.facebook ?? current.socials.facebook,
+      whatsapp: data.socials?.whatsapp ?? current.socials.whatsapp,
+      logoUrl: data.logoUrl ?? current.logoUrl,
+      avatarUrl: data.avatarUrl ?? current.avatarUrl,
+      rating: data.rating ?? current.rating,
+      dealsCount: data.dealsCount ?? current.dealsCount,
+      experienceYears: data.experienceYears ?? current.experienceYears,
+      specializations: data.specializations ?? current.specializations,
     },
-  };
-
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(profilePath(), `${JSON.stringify(profile, null, 2)}\n`, "utf8");
-  return profile;
-}
-
-async function writeCollection<TName extends CollectionName>(
-  collection: TName,
-  items: CollectionMap[TName][],
-) {
-  await mkdir(DATA_DIR, { recursive: true });
-  await writeFile(filePath(collection), `${JSON.stringify(items, null, 2)}\n`, "utf8");
-}
-
-export async function listItems<TName extends CollectionName>(
-  collection: TName,
-  publicOnly = false,
-) {
-  const items = await readCollection(collection);
-
-  if (!publicOnly) {
-    return items;
-  }
-
-  return items.filter((item) => item.status === "published");
-}
-
-export async function createItem<TName extends CollectionName>(
-  collection: TName,
-  data: Partial<CollectionMap[TName]>,
-) {
-  const items = await readCollection(collection);
-  const date = now();
-  const id = `${collection.slice(0, -1)}-${Date.now()}`;
-  const title = String("title" in data ? data.title || "" : "fullName" in data ? data.fullName || "" : "");
-  const base = {
-    ...data,
-    id,
-    slug: normalizeSlug(String("slug" in data ? data.slug || title : title), id),
-    status: data.status || "draft",
-    createdAt: date,
-    updatedAt: date,
-  } as CollectionMap[TName];
-
-  const nextItems = [base, ...items] as CollectionMap[TName][];
-  await writeCollection(collection, nextItems);
-  return base;
-}
-
-export async function updateItem<TName extends CollectionName>(
-  collection: TName,
-  id: string,
-  data: Partial<CollectionMap[TName]>,
-) {
-  const items = await readCollection(collection);
-  let updated: CollectionMap[TName] | null = null;
-  const nextItems = items.map((item) => {
-    if (item.id !== id) {
-      return item;
-    }
-
-    updated = {
-      ...item,
-      ...data,
-      slug: normalizeSlug(
-        String("slug" in data ? data.slug || itemSlug(item) : itemSlug(item)),
-        item.id,
-      ),
-      updatedAt: now(),
-    } as CollectionMap[TName];
-    return updated;
   });
 
-  if (!updated) {
-    return null;
+  return {
+    name: updated.name,
+    description: updated.description,
+    phone: updated.phone,
+    email: updated.email,
+    socials: {
+      instagram: updated.instagram,
+      telegram: updated.telegram,
+      facebook: updated.facebook,
+      whatsapp: updated.whatsapp,
+    },
+    logoUrl: updated.logoUrl,
+    avatarUrl: updated.avatarUrl,
+    rating: updated.rating,
+    dealsCount: updated.dealsCount,
+    experienceYears: updated.experienceYears,
+    specializations: updated.specializations,
+  };
+}
+
+export async function listItems(collection: CollectionName, publicOnly = false) {
+  const where = publicOnly ? { status: 'published' } : {};
+  
+  if (collection === 'listings') {
+    return await prisma.listing.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
 
-  await writeCollection(collection, nextItems);
-  return updated;
+  if (collection === 'employees') {
+    return await prisma.employee.findMany({ where, orderBy: { createdAt: 'desc' } });
+  }
+
+  return await prisma.serviceItem.findMany({ where, orderBy: { sortOrder: 'asc' } });
+}
+
+export async function createItem(collection: CollectionName, data: CollectionInput) {
+  const title = String('title' in data ? data.title || '' : 'fullName' in data ? data.fullName || '' : '');
+  const idStr = `${collection.slice(0, -1)}-${Date.now()}`;
+
+  if (collection === 'listings') {
+    const slug = normalizeSlug(String('slug' in data && data.slug ? data.slug : title), idStr);
+    const baseData = {
+      ...data,
+      slug,
+      status: data.status || 'draft',
+    } as Prisma.ListingUncheckedCreateInput;
+    baseData.currency = 'TJS';
+    if (!baseData.id) delete baseData.id;
+    return await prisma.listing.create({ data: baseData });
+  } else if (collection === 'employees') {
+    const baseData = {
+      ...data,
+      status: data.status || 'draft',
+    } as Prisma.EmployeeUncheckedCreateInput;
+    if (!baseData.id) delete baseData.id;
+    return await prisma.employee.create({ data: baseData });
+  } else if (collection === 'services') {
+    const slug = normalizeSlug(String('slug' in data && data.slug ? data.slug : title), idStr);
+    const baseData = {
+      ...data,
+      slug,
+      status: data.status || 'draft',
+    } as Prisma.ServiceItemUncheckedCreateInput;
+    if (!baseData.id) delete baseData.id;
+    if (baseData.sortOrder !== undefined) baseData.sortOrder = Number(baseData.sortOrder);
+    return await prisma.serviceItem.create({ data: baseData });
+  }
+}
+
+export async function updateItem(collection: CollectionName, id: string, data: CollectionInput) {
+  try {
+    const slug = 'slug' in data ? normalizeSlug(String(data.slug || ''), id) : undefined;
+    const updateData: Record<string, unknown> = { ...data };
+    if (slug) updateData.slug = slug;
+
+    if (collection === 'listings') {
+      return await prisma.listing.update({ where: { id }, data: updateData as Prisma.ListingUncheckedUpdateInput });
+    } else if (collection === 'employees') {
+      return await prisma.employee.update({ where: { id }, data: updateData as Prisma.EmployeeUncheckedUpdateInput });
+    } else if (collection === 'services') {
+      if (updateData.sortOrder !== undefined) updateData.sortOrder = Number(updateData.sortOrder);
+      return await prisma.serviceItem.update({ where: { id }, data: updateData as Prisma.ServiceItemUncheckedUpdateInput });
+    }
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteItem(collection: CollectionName, id: string) {
-  const items = await readCollection(collection);
-  const nextItems = items.filter((item) => item.id !== id);
-  await writeCollection(collection, nextItems as CollectionItem[]);
-  return nextItems.length !== items.length;
+  try {
+    if (collection === 'listings') {
+      await prisma.listing.delete({ where: { id } });
+    } else if (collection === 'employees') {
+      await prisma.employee.delete({ where: { id } });
+    } else if (collection === 'services') {
+      await prisma.serviceItem.delete({ where: { id } });
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function getPublicPayload(collection: CollectionName) {
   const items = await listItems(collection, true);
-  const employees = collection === "listings" ? await readCollection("employees") : [];
-  const users = collection === "listings" ? await readUsers() : [];
 
-  if (collection !== "listings") {
+  if (collection !== 'listings') {
     return {
       data: items,
       meta: { pagination: { page: 1, pageSize: items.length, pageCount: 1, total: items.length } },
     };
   }
 
-  const listings = (items as Listing[]).map((listing) => {
+  const employees = await prisma.employee.findMany();
+  const users = await prisma.user.findMany();
+
+  const listings = (items as StoredListing[]).map((listing) => {
     const employee = employees.find((item) => item.id === listing.employeeId);
     const seller = users.find((item) => item.id === listing.sellerId);
     return {
@@ -313,10 +280,10 @@ export async function getPublicPayload(collection: CollectionName) {
       mainImage: listing.mainImage ? { url: listing.mainImage } : null,
       gallery: listing.gallery
         ? listing.gallery
-            .split("\n")
-            .map((url) => url.trim())
+            .split('\n')
+            .map((url: string) => url.trim())
             .filter(Boolean)
-            .map((url) => ({ url }))
+            .map((url: string) => ({ url }))
         : [],
       employee: employee
         ? {
@@ -329,14 +296,14 @@ export async function getPublicPayload(collection: CollectionName) {
         name: seller?.name || listing.sellerName,
         phone: seller?.phone || listing.sellerPhone,
         whatsapp: seller?.whatsapp || listing.sellerWhatsapp,
-        telegram: seller?.telegram || "",
-        instagram: seller?.instagram || "",
-        facebook: seller?.facebook || "",
+        telegram: seller?.telegram || '',
+        instagram: seller?.instagram || '',
+        facebook: seller?.facebook || '',
         avatar: (seller?.avatar || listing.sellerAvatar) ? { url: seller?.avatar || listing.sellerAvatar } : null,
         rating: seller?.rating || 5,
         dealsCount: seller?.dealsCount || 0,
         experienceYears: seller?.experienceYears || 0,
-        specializations: seller?.specializations || "",
+        specializations: seller?.specializations || '',
       },
     };
   });

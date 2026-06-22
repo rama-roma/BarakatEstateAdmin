@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Listing {
+  id              String   @id @default(uuid())
+  title           String
+  slug            String
+  dealType        String
+  propertyType    String
+  price           Float
+  currency        String   @default("TJS")
+  district        String
+  address         String
+  rooms           Int
+  area            Float
+  floor           Int
+  totalFloors     Int
+  yearBuilt       Int
+  description     String
+  features        String
+  latitude        Float
+  longitude       Float
+  mapX            Float
+  mapY            Float
+  mainImage       String
+  gallery         String
+  employeeId      String
+  sellerId        String
+  sellerName      String
+  sellerPhone     String
+  sellerWhatsapp  String
+  sellerAvatar    String
+  isFeatured      Boolean
+  status          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([sellerId])
+  @@index([slug])
+}
+
+model Employee {
+  id              String   @id @default(uuid())
+  fullName        String
+  position        String
+  phone           String
+  whatsapp        String
+  email           String
+  avatar          String
+  bio             String
+  rating          Float
+  dealsCount      Int
+  experienceYears Int
+  specializations String
+  status          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ServiceItem {
+  id          String   @id @default(uuid())
+  title       String
+  slug        String
+  description String
+  priceLabel  String
+  icon        String
+  sortOrder   Int
+  status      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id              String   @id @default(uuid())
+  username        String   @unique
+  password        String
+  name            String
+  email           String
+  phone           String
+  whatsapp        String
+  telegram        String
+  instagram       String
+  facebook        String
+  avatar          String
+  bio             String
+  rating          Float
+  dealsCount      Int
+  experienceYears Int
+  specializations String
+  role            String   @default("user")
+
+  @@index([username])
+  @@index([email])
+}
+
+model Profile {
+  id              String   @id @default("default")
+  name            String
+  description     String
+  phone           String
+  email           String
+  instagram       String
+  telegram        String
+  facebook        String
+  whatsapp        String
+  logoUrl         String
+  avatarUrl       String
+  rating          Float
+  dealsCount      Int
+  experienceYears Int
+  specializations String
+}
