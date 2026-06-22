@@ -24,12 +24,16 @@ export const profileUpdateSchema = z.object({
   avatar: z.string().url("Неверный URL аватара").optional().or(z.literal("")),
   bio: z.string().max(500).optional().or(z.literal("")),
   specializations: z.string().max(200).optional().or(z.literal("")),
+  rating: z.number().min(0).max(5).optional(),
+  dealsCount: z.number().min(0).optional(),
+  experienceYears: z.number().min(0).optional(),
 });
 
 export const listingSchema = z.object({
   title: z.string().min(3, "Заголовок должен быть от 3 символов").max(100),
   dealType: z.enum(["sale", "rent"]),
   propertyType: z.string().min(1, "Укажите тип недвижимости"),
+  currency: z.enum(["TJS", "USD"]).optional().default("TJS"),
   price: z.number().min(0, "Цена не может быть отрицательной"),
   district: z.string().min(1, "Укажите район"),
   address: z.string().min(1, "Укажите адрес"),

@@ -33,6 +33,7 @@ const emptyForms: FormState = {
     dealType: "sale",
     propertyType: "Квартира",
     price: 0,
+    currency: "TJS",
     district: "Душанбе",
     address: "",
     rooms: 1,
@@ -64,6 +65,9 @@ const emptyForms: FormState = {
     },
     avatarUrl: "",
     specializations: "",
+    rating: 5,
+    dealsCount: 0,
+    experienceYears: 0,
   },
 };
 
@@ -509,6 +513,9 @@ function buildPayload(tab: Tab, data: FormData) {
       facebook: String(data.get("facebook") || ""),
       avatar: String(data.get("avatar") || ""),
       specializations: String(data.get("specializations") || ""),
+      rating: toNumber(data.get("rating")),
+      dealsCount: toNumber(data.get("dealsCount")),
+      experienceYears: toNumber(data.get("experienceYears")),
     };
   }
 
@@ -517,6 +524,7 @@ function buildPayload(tab: Tab, data: FormData) {
     dealType: data.get("dealType") === "rent" ? "rent" : "sale",
     propertyType: String(data.get("propertyType") || "Квартира"),
     price: toNumber(data.get("price")),
+    currency: String(data.get("currency") || "TJS"),
     district: String(data.get("district") || ""),
     address: String(data.get("address") || ""),
     rooms: toNumber(data.get("rooms")),
@@ -604,7 +612,12 @@ function renderForm(tab: Tab, form: FormState) {
         <Field name="email" title="Email" value={item.email} />
         <Field name="whatsapp" title="WhatsApp" value={item.socials?.whatsapp} />
         <Field name="telegram" title="Telegram" value={item.socials?.telegram} />
+        <Field name="instagram" title="Instagram" value={item.socials?.instagram} />
+        <Field name="facebook" title="Facebook" value={item.socials?.facebook} />
         <Field name="specializations" title="Специализация" value={item.specializations} />
+        <Field name="rating" title="Средняя оценка" type="number" value={item.rating} />
+        <Field name="dealsCount" title="Успешные сделки" type="number" value={item.dealsCount} />
+        <Field name="experienceYears" title="Стаж работы (лет)" type="number" value={item.experienceYears} />
         <div className="full submit-bar">
           <button className="btn primary" type="submit">Сохранить</button>
         </div>
@@ -618,7 +631,8 @@ function renderForm(tab: Tab, form: FormState) {
       <Field name="title" title="Название" value={item.title} />
       <Select name="dealType" title="Тип сделки" value={item.dealType} options={[["sale", "Продажа"], ["rent", "Аренда"]]} />
       <Field name="propertyType" title="Тип недвижимости" value={item.propertyType} />
-      <Field name="price" title="Цена (TJS)" type="number" value={item.price} />
+      <Field name="price" title="Цена" type="number" value={item.price} />
+      <Select name="currency" title="Валюта" value={item.currency} options={[["TJS", "TJS"], ["USD", "USD"]]} />
       <Field name="district" title="Район" value={item.district} />
       <Field name="address" title="Адрес" value={item.address} />
       <Field name="rooms" title="Комнаты" type="number" value={item.rooms} />
@@ -626,6 +640,10 @@ function renderForm(tab: Tab, form: FormState) {
       <Field name="floor" title="Этаж" type="number" value={item.floor} />
       <Field name="totalFloors" title="Всего этажей" type="number" value={item.totalFloors} />
       <Field name="yearBuilt" title="Год постройки" type="number" value={item.yearBuilt} />
+      <Field name="latitude" title="Latitude (Широта)" type="number" value={item.latitude} />
+      <Field name="longitude" title="Longitude (Долгота)" type="number" value={item.longitude} />
+      <Field name="mapX" title="Позиция на карте X (%)" type="number" value={item.mapX} />
+      <Field name="mapY" title="Позиция на карте Y (%)" type="number" value={item.mapY} />
       <label className="field full">
         <span>Главное фото: загрузить файл</span>
         <input name="mainImageFile" type="file" accept="image/*" />
@@ -636,7 +654,14 @@ function renderForm(tab: Tab, form: FormState) {
         <input name="galleryFiles" type="file" accept="image/*" multiple />
       </label>
       <TextArea name="gallery" title="Или URL галереи (каждый с новой строки)" value={item.gallery} />
+      <TextArea name="features" title="Удобства (обязательно через запятую)" value={item.features} />
       <TextArea name="description" title="Описание" value={item.description} />
+      
+      <label className="field" style={{ display: "flex", alignItems: "center", gap: "8px", flexDirection: "row", cursor: "pointer" }}>
+        <input type="checkbox" name="isFeatured" defaultChecked={item.isFeatured} style={{ width: "auto" }} />
+        <span style={{ fontSize: "14px", fontWeight: 600 }}>В Избранное (Featured)</span>
+      </label>
+
       <Select name="status" title="Статус" value={item.status} options={[["draft", "Черновик"], ["published", "Опубликовано"]]} />
       <div className="full submit-bar">
         <button className="btn primary" type="submit">Сохранить</button>
