@@ -33,7 +33,6 @@ export const listingSchema = z.object({
   title: z.string().min(3, "Заголовок должен быть от 3 символов").max(100),
   dealType: z.enum(["sale", "rent"]),
   propertyType: z.string().min(1, "Укажите тип недвижимости"),
-  currency: z.enum(["TJS", "USD"]).optional().default("TJS"),
   price: z.number().min(0, "Цена не может быть отрицательной"),
   district: z.string().min(1, "Укажите район"),
   address: z.string().min(1, "Укажите адрес"),
