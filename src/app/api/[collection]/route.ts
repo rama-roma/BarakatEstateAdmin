@@ -2,6 +2,7 @@ import { createItem, getPublicPayload, listItems } from "@/lib/store";
 import { isCollection, jsonResponse } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import { listingSchema } from "@/lib/validations";
+import type { Listing } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,8 @@ export async function GET(request: Request, context: CollectionContext) {
     const items = await listItems(collection);
     // If it's listings, only return user's listings unless admin
     if (collection === "listings" && session.role !== "admin") {
-      return jsonResponse({ data: items.filter((item: any) => item.sellerId === session.userId) });
+      const listings = items as unknown as Listing[];
+      return jsonResponse({ data: listings.filter((item) => item.sellerId === session.userId) });
     }
     return jsonResponse({ data: items });
   }

@@ -1,6 +1,6 @@
 import { deleteItem, updateItem } from "@/lib/store";
 import { isCollection, jsonResponse } from "@/lib/api";
-import { getSession } from "@/lib/auth";
+import { getSession, type SessionPayload } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -14,7 +14,7 @@ type CollectionItemContext = {
   params: Promise<{ collection: string; id: string }>;
 };
 
-async function verifyOwnership(collection: string, id: string, session: any) {
+async function verifyOwnership(collection: string, id: string, session: SessionPayload) {
   if (session.role === "admin") return true;
   
   if (collection === "listings") {

@@ -3,6 +3,7 @@ import { registerSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { createSession, checkRateLimit } from "@/lib/auth";
+import type { User } from "@/lib/types";
 
 export const runtime = "nodejs";
 
@@ -53,12 +54,15 @@ export async function POST(request: Request) {
       },
     });
     
-    await createSession(user);
+    const typedUser = { ...user, role: user.role as User["role"] };
+    await createSession(typedUser);
     
-    const { password: _, ...safeUser } = user;
+    const safeUser = { ...typedUser };
+    delete (safeUser as Partial<typeof typedUser>).password;
     return jsonResponse({ message: "Успешная регистрация", user: safeUser }, 201);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Register Error:", error);
-    return jsonResponse({ error: "Внутренняя ошибка сервера", details: error?.message || String(error) }, 500);
+    const message = error instanceof Error ? error.message : String(error);
+    return jsonResponse({ error: "Внутренняя ошибка сервера", details: message }, 500);
   }
 }

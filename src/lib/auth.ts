@@ -4,8 +4,9 @@ import type { User } from "./types";
 
 const secretKey = process.env.JWT_SECRET || "default_super_secret_key_change_me_in_prod";
 const encodedKey = new TextEncoder().encode(secretKey);
+export type SessionPayload = { userId: string; role: User["role"] };
 
-export async function signToken(payload: { userId: string; role: string }) {
+export async function signToken(payload: SessionPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -16,13 +17,13 @@ export async function signToken(payload: { userId: string; role: string }) {
 export async function verifyToken(token: string) {
   try {
     const { payload } = await jwtVerify(token, encodedKey);
-    return payload as { userId: string; role: string };
-  } catch (error) {
+    return payload as SessionPayload;
+  } catch {
     return null;
   }
 }
 
-export async function createSession(user: User) {
+export async function createSession(user: Pick<User, "id" | "role">) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const token = await signToken({ userId: user.id, role: user.role });
   const cookieStore = await cookies();

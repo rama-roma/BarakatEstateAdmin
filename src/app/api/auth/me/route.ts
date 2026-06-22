@@ -18,6 +18,7 @@ export async function GET() {
     return jsonResponse({ error: "Пользователь не найден" }, 404);
   }
 
-  const { password: _, ...safeUser } = user;
+  const safeUser = { ...user };
+  delete (safeUser as Partial<typeof user>).password;
   return jsonResponse({ user: safeUser });
 }

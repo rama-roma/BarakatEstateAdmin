@@ -26,12 +26,12 @@ export async function POST(request: Request) {
       return jsonResponse({ error: "Неверный логин или пароль" }, 401);
     }
     
-    // Create JWT session cookie
-    await createSession(user as any); // authUser type mismatch with User but both have id and role
+    await createSession(user);
 
     return jsonResponse({ user });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Login Error:", error);
-    return jsonResponse({ error: "Внутренняя ошибка сервера", details: error?.message || String(error) }, 500);
+    const message = error instanceof Error ? error.message : String(error);
+    return jsonResponse({ error: "Внутренняя ошибка сервера", details: message }, 500);
   }
 }

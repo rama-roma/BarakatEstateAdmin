@@ -4,7 +4,6 @@ import {
   Building2,
   CheckCircle2,
   Contact,
-  Eye,
   KeyRound,
   LogOut,
   Pencil,
@@ -148,7 +147,7 @@ export default function UserDashboard() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(cloneForm(emptyForms));
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter] = useState("all");
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -538,7 +537,15 @@ function buildPayload(tab: Tab, data: FormData) {
   };
 }
 
-function Field({ name, title, value, type = "text", className = "" }: any) {
+type FieldProps = {
+  name: string;
+  title: string;
+  value?: string | number;
+  type?: string;
+  className?: string;
+};
+
+function Field({ name, title, value, type = "text", className = "" }: FieldProps) {
   return (
     <label className={`field ${className}`}>
       <span>{title}</span>
@@ -547,7 +554,7 @@ function Field({ name, title, value, type = "text", className = "" }: any) {
   );
 }
 
-function TextArea({ name, title, value }: any) {
+function TextArea({ name, title, value }: { name: string; title: string; value?: string }) {
   return (
     <label className="field full">
       <span>{title}</span>
@@ -556,12 +563,22 @@ function TextArea({ name, title, value }: any) {
   );
 }
 
-function Select({ name, title, value, options }: any) {
+function Select({
+  name,
+  title,
+  value,
+  options,
+}: {
+  name: string;
+  title: string;
+  value?: string;
+  options: Array<[string, string]>;
+}) {
   return (
     <label className="field">
       <span>{title}</span>
       <select defaultValue={value} name={name}>
-        {options.map(([val, label]: any) => (
+        {options.map(([val, label]) => (
           <option key={val} value={val}>{label}</option>
         ))}
       </select>
