@@ -643,6 +643,7 @@ function buildPayload(tab: Tab, data: FormData, user: AuthUser) {
       currency: "TJS",
       district: String(data.get("district") || ""),
       address: String(data.get("address") || ""),
+
       rooms: toNumber(data.get("rooms")),
       area: toNumber(data.get("area")),
       floor: toNumber(data.get("floor")),
@@ -650,6 +651,9 @@ function buildPayload(tab: Tab, data: FormData, user: AuthUser) {
       yearBuilt: toNumber(data.get("yearBuilt")),
       description: String(data.get("description") || ""),
       features: String(data.get("features") || ""),
+      constructionStage: String(data.get("constructionStage") || ""),
+      renovation: String(data.get("renovation") || ""),
+      landmark: String(data.get("landmark") || ""),
       latitude: toNumber(data.get("latitude")),
       longitude: toNumber(data.get("longitude")),
       mapX: toNumber(data.get("mapX")),
@@ -736,15 +740,18 @@ function renderForm(tab: Tab, form: FormState) {
         <div className="form-grid">
           <Field name="title" title="Название" value={item.title} />
           <Select name="dealType" title="Тип сделки" value={item.dealType} options={[["sale", "Продажа"], ["rent", "Аренда"]]} />
-          <Field name="propertyType" title="Тип недвижимости" value={item.propertyType} />
+          <Select name="propertyType" title="Тип недвижимости" value={item.propertyType || "Квартира"} options={[["Квартира", "Квартира"], ["Дом", "Дом"], ["Студия", "Студия"], ["Коммерческая", "Коммерческая"], ["Новостройка", "Новостройка"]]} />
           <Field name="price" title="Цена" type="number" value={item.price} />
-          <Field name="district" title="Район" value={item.district} />
+          <Select name="district" title="Район" value={item.district || ""} options={[["Центр", "Центр"], ["Исмоили Сомони", "Исмоили Сомони"], ["Сино", "Сино"], ["Фирдавси", "Фирдавси"], ["Шохмансур", "Шохмансур"]]} />
           <Field name="address" title="Адрес" value={item.address} />
           <Field name="rooms" title="Комнаты" type="number" value={item.rooms} />
           <Field name="area" title="Площадь" type="number" value={item.area} />
           <Field name="floor" title="Этаж" type="number" value={item.floor} />
           <Field name="totalFloors" title="Всего этажей" type="number" value={item.totalFloors} />
           <Field name="yearBuilt" title="Год постройки" type="number" value={item.yearBuilt} />
+          <Select name="constructionStage" title="Стадия строительства" value={item.constructionStage || ""} options={[["", "Любая"], ["Построен", "Построен"], ["Строится", "Строится"], ["Котлован", "Котлован"]]} />
+          <Select name="renovation" title="Ремонт" value={item.renovation || ""} options={[["", "Любая"], ["С ремонтом", "С ремонтом"], ["Без ремонта (коробка)", "Без ремонта (коробка)"], ["Евроремонт", "Евроремонт"], ["Дизайнерский", "Дизайнерский"]]} />
+          <Field name="landmark" title="Ориентир" value={item.landmark || ""} />
           <Field name="latitude" title="Latitude" type="number" value={item.latitude} />
           <Field name="longitude" title="Longitude" type="number" value={item.longitude} />
           <Field name="mapX" title="Позиция на карте X (%)" type="number" value={item.mapX} />

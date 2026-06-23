@@ -315,25 +315,25 @@ export default function UserDashboard() {
   if (!currentUser) return <AuthScreen onAuth={(user) => setCurrentUser(user)} />;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-800 font-sans p-4 md:p-8 flex justify-center">
-      <div className="max-w-7xl w-full flex flex-col lg:flex-row gap-8">
+    <main className="min-h-screen bg-slate-50 text-slate-800 font-sans p-0 lg:p-8 flex justify-center">
+      <div className="max-w-7xl w-full flex flex-col lg:flex-row gap-0 lg:gap-8">
         
-        {/* SIDEBAR */}
-        <aside className="w-full lg:w-72 shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col sticky top-8 h-auto lg:h-[calc(100vh-4rem)]">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="w-12 h-12 bg-yellow-100 rounded-xl flex items-center justify-center overflow-hidden">
-              <img src="/barakat.PNG" alt="Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="font-bold text-xl tracking-tight">Barakat</div>
+        {/* SIDEBAR / TOPBAR */}
+        <aside className="w-full lg:w-72 shrink-0 bg-white lg:rounded-2xl shadow-sm border-b lg:border border-slate-200 p-4 lg:p-6 flex flex-col sticky top-0 lg:top-8 z-30 h-auto lg:h-[calc(100vh-4rem)]">
+          <div className="flex items-center justify-between lg:mb-8 px-2 lg:px-0">
+            <img src="/barakat.PNG" alt="Barakat Estate" className="w-20 lg:w-28 h-auto object-contain" />
+            <button onClick={handleLogout} type="button" className="lg:hidden p-2 text-red-600 hover:bg-red-50 rounded-xl transition">
+              <LogOut size={20} />
+            </button>
           </div>
           
-          <nav className="flex flex-col gap-2">
+          <nav className="flex flex-row lg:flex-col gap-2 overflow-x-auto mt-4 lg:mt-0 pb-1 lg:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
                 type="button"
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl transition font-medium text-sm ${
+                className={`flex items-center gap-3 px-4 py-2.5 lg:py-3 rounded-xl transition font-medium text-sm whitespace-nowrap ${
                   activeTab === tab.id ? "bg-yellow-50 text-yellow-800 shadow-inner" : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -343,7 +343,7 @@ export default function UserDashboard() {
             ))}
           </nav>
 
-          <div className="mt-auto pt-6 border-t border-slate-100">
+          <div className="hidden lg:flex mt-auto pt-6 border-t border-slate-100">
             <button 
               onClick={handleLogout} 
               type="button"
@@ -356,19 +356,13 @@ export default function UserDashboard() {
         </aside>
 
         {/* CONTENT */}
-        <section className="flex-1 min-w-0 flex flex-col gap-8">
+        <section className="flex-1 min-w-0 flex flex-col gap-6 lg:gap-8 p-4 lg:p-0">
           
           {/* TOPBAR */}
           <header className="bg-white rounded-2xl shadow-sm border border-slate-200 px-8 py-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
               {tabs.find((tab) => tab.id === activeTab)?.label}
             </h1>
-            {loading && (
-              <div className="flex items-center gap-2 bg-yellow-50 text-yellow-800 px-4 py-1.5 rounded-full text-sm font-medium">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                Загрузка...
-              </div>
-            )}
           </header>
 
           {/* MAIN FORMS */}
@@ -389,7 +383,7 @@ export default function UserDashboard() {
             </div>
 
             <form key={`${activeTab}-${editingId || "new"}`} onSubmit={submitForm}>
-              {renderForm(activeTab, form)}
+              {renderForm(activeTab, form, loading)}
             </form>
           </div>
 
@@ -604,6 +598,9 @@ function buildPayload(tab: Tab, data: FormData) {
     yearBuilt: toNumber(data.get("yearBuilt")),
     description: String(data.get("description") || ""),
     features: String(data.get("features") || ""),
+    constructionStage: String(data.get("constructionStage") || ""),
+    renovation: String(data.get("renovation") || ""),
+    landmark: String(data.get("landmark") || ""),
     latitude: toNumber(data.get("latitude")),
     longitude: toNumber(data.get("longitude")),
     mapX: toNumber(data.get("mapX")),
@@ -694,7 +691,7 @@ function FileUpload({ name, title, multiple = false, colSpan = "full" }: { name:
   );
 }
 
-function renderForm(tab: Tab, form: FormState) {
+function renderForm(tab: Tab, form: FormState, loading: boolean) {
   const values = form[tab];
 
   if (tab === "profile") {
@@ -726,8 +723,8 @@ function renderForm(tab: Tab, form: FormState) {
         </FormSection>
 
         <div className="flex justify-end pt-6 border-t border-slate-100">
-          <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit">
-            Сохранить настройки
+          <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>
+            {loading ? "Сохранение..." : "Сохранить настройки"}
           </button>
         </div>
       </div>
@@ -740,7 +737,7 @@ function renderForm(tab: Tab, form: FormState) {
       <FormSection title="Общая информация">
         <Field name="title" title="Название объявления" value={item.title} colSpan={2} />
         <Select name="dealType" title="Тип сделки" value={item.dealType} options={[["sale", "Продажа"], ["rent", "Аренда"]]} />
-        <Field name="propertyType" title="Тип недвижимости" value={item.propertyType} />
+        <Select name="propertyType" title="Тип недвижимости" value={item.propertyType || "Квартира"} options={[["Квартира", "Квартира"], ["Дом", "Дом"], ["Студия", "Студия"], ["Коммерческая", "Коммерческая"], ["Новостройка", "Новостройка"]]} />
         <Field name="price" title="Цена (TJS)" type="number" value={item.price} colSpan={2} />
       </FormSection>
 
@@ -750,11 +747,14 @@ function renderForm(tab: Tab, form: FormState) {
         <Field name="yearBuilt" title="Год постройки" type="number" value={item.yearBuilt} />
         <Field name="floor" title="Этаж" type="number" value={item.floor} />
         <Field name="totalFloors" title="Всего этажей" type="number" value={item.totalFloors} />
+        <Select name="constructionStage" title="Стадия строительства" value={item.constructionStage || ""} options={[["", "Любая"], ["Построен", "Построен"], ["Строится", "Строится"], ["Котлован", "Котлован"]]} />
+        <Select name="renovation" title="Ремонт" value={item.renovation || ""} options={[["", "Любая"], ["С ремонтом", "С ремонтом"], ["Без ремонта (коробка)", "Без ремонта (коробка)"], ["Евроремонт", "Евроремонт"], ["Дизайнерский", "Дизайнерский"]]} />
       </FormSection>
 
       <FormSection title="Расположение">
-        <Field name="district" title="Район" value={item.district} />
-        <Field name="address" title="Адрес" value={item.address} colSpan={2} />
+        <Select name="district" title="Район" value={item.district || ""} options={[["Центр", "Центр"], ["Исмоили Сомони", "Исмоили Сомони"], ["Сино", "Сино"], ["Фирдавси", "Фирдавси"], ["Шохмансур", "Шохмансур"]]} />
+        <Field name="address" title="Адрес" value={item.address} />
+        <Field name="landmark" title="Ориентир" value={item.landmark || ""} />
         <div className="col-span-full grid grid-cols-2 lg:grid-cols-4 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
           <Field name="latitude" title="Latitude (Широта)" type="number" value={item.latitude} />
           <Field name="longitude" title="Longitude (Долгота)" type="number" value={item.longitude} />
@@ -789,8 +789,8 @@ function renderForm(tab: Tab, form: FormState) {
           </label>
         </div>
 
-        <button className="px-8 py-3.5 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm w-full sm:w-auto mt-6 sm:mt-0" type="submit">
-          Сохранить объявление
+        <button className="px-8 py-3.5 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm w-full sm:w-auto mt-6 sm:mt-0 disabled:opacity-50 disabled:cursor-not-allowed" type="submit" disabled={loading}>
+          {loading ? "Сохранение..." : "Сохранить объявление"}
         </button>
       </div>
     </div>

@@ -25,6 +25,9 @@ model Listing {
   yearBuilt       Int
   description     String
   features        String
+  constructionStage String?
+  renovation      String?
+  landmark        String?
   latitude        Float
   longitude       Float
   mapX            Float
