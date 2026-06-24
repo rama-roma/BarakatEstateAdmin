@@ -120,4 +120,29 @@ model Profile {
   dealsCount      Int
   experienceYears Int
   specializations String
+  districts       String   @default("Центр, Исмоили Сомони, Сино, Фирдавси, Шохмансур")
+  propertyTypes   String   @default("Квартира, Вторичка, Новостройки, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната")
+  dealTypes       String   @default("sale:Продажа, rent:Аренда")
+}
+
+model Application {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String
+  service     String
+  message     String
+  status      String   @default("new")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Banner {
+  id          String   @id @default(uuid())
+  title       String
+  imageUrl    String
+  linkUrl     String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

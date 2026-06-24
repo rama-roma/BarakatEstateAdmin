@@ -86,6 +86,31 @@ export type Profile = {
   dealsCount: number;
   experienceYears: number;
   specializations: string;
+  districts: string;
+  propertyTypes: string;
+  dealTypes: string;
+};
+
+export type Application = {
+  id: string;
+  name: string;
+  phone: string;
+  service: string;
+  message: string;
+  status: "new" | "read" | "completed";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Banner = {
+  id: string;
+  title: string;
+  imageUrl: string;
+  linkUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type User = {
@@ -110,6 +135,6 @@ export type User = {
 
 export type AuthUser = Omit<User, "password">;
 
-export type CollectionName = "listings" | "employees" | "services";
+export type CollectionName = "listings" | "employees" | "services" | "applications" | "users";
 
-export type CollectionItem = Listing | Employee | ServiceItem;
+export type CollectionItem = Listing | Employee | ServiceItem | Application | User;

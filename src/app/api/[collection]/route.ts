@@ -51,7 +51,7 @@ export async function POST(request: Request, context: CollectionContext) {
   }
 
   const session = await getSession();
-  if (!session) {
+  if (!session && collection !== "applications") {
     return jsonResponse({ error: "Не авторизован" }, 401);
   }
 
@@ -63,9 +63,18 @@ export async function POST(request: Request, context: CollectionContext) {
       return jsonResponse({ error: "Ошибка валидации", details: parsed.error.format() }, 400);
     }
     // Enforce sellerId
-    data.sellerId = session.userId;
+    data.sellerId = session!.userId;
   }
 
-  const item = await createItem(collection, data);
-  return jsonResponse({ data: item }, 201);
+  try {
+    const item = await createItem(collection, data);
+    return jsonResponse({ data: item }, 201);
+  } catch (error: any) {
+    console.error("API POST Error:", error);
+    let message = error.message || "Внутренняя ошибка сервера";
+    if (collection === "users" && message.includes("Unique constraint failed") && message.includes("username")) {
+      message = "Пользователь с таким логином уже существует.";
+    }
+    return jsonResponse({ error: message }, 500);
+  }
 }

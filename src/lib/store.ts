@@ -110,6 +110,9 @@ export async function readProfile(): Promise<Profile> {
         dealsCount: 0,
         experienceYears: 1,
         specializations: '',
+        districts: "Центр, Исмоили Сомони, Сино, Фирдавси, Шохмансур",
+        propertyTypes: "Квартира, Вторичка, Новостройки, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната",
+        dealTypes: "sale:Продажа, rent:Аренда",
       },
     });
   }
@@ -131,6 +134,9 @@ export async function readProfile(): Promise<Profile> {
     dealsCount: profile.dealsCount,
     experienceYears: profile.experienceYears,
     specializations: profile.specializations,
+    districts: profile.districts,
+    propertyTypes: profile.propertyTypes,
+    dealTypes: profile.dealTypes,
   };
 }
 
@@ -154,6 +160,9 @@ export async function writeProfile(data: Partial<Profile>): Promise<Profile> {
       dealsCount: data.dealsCount ?? current.dealsCount,
       experienceYears: data.experienceYears ?? current.experienceYears,
       specializations: data.specializations ?? current.specializations,
+      districts: data.districts ?? current.districts,
+      propertyTypes: data.propertyTypes ?? current.propertyTypes,
+      dealTypes: data.dealTypes ?? current.dealTypes,
     },
   });
 
@@ -174,6 +183,9 @@ export async function writeProfile(data: Partial<Profile>): Promise<Profile> {
     dealsCount: updated.dealsCount,
     experienceYears: updated.experienceYears,
     specializations: updated.specializations,
+    districts: updated.districts,
+    propertyTypes: updated.propertyTypes,
+    dealTypes: updated.dealTypes,
   };
 }
 
@@ -188,6 +200,17 @@ export async function listItems(collection: CollectionName, publicOnly = false) 
     return await prisma.employee.findMany({ where, orderBy: { createdAt: 'desc' } });
   }
 
+  if (collection === 'applications') {
+    return await prisma.application.findMany({ orderBy: { createdAt: 'desc' } });
+  }
+
+
+
+  if (collection === 'users') {
+    const users = await prisma.user.findMany({ orderBy: { username: 'asc' } });
+    return users.map((u) => publicUser(u as any));
+  }
+
   return await prisma.serviceItem.findMany({ where, orderBy: { sortOrder: 'asc' } });
 }
 
@@ -196,12 +219,13 @@ export async function createItem(collection: CollectionName, data: CollectionInp
   const idStr = `${collection.slice(0, -1)}-${Date.now()}`;
 
   if (collection === 'listings') {
-    const slug = normalizeSlug(String('slug' in data && data.slug ? data.slug : title), idStr);
+    const anyData = data as any;
+    const slug = normalizeSlug(String('slug' in anyData && anyData.slug ? anyData.slug : title), idStr);
     const baseData = {
-      ...data,
+      ...anyData,
       slug,
-      status: data.status || 'draft',
-      currency: ('currency' in data && data.currency) ? data.currency : 'TJS',
+      status: anyData.status || 'draft',
+      currency: ('currency' in anyData && anyData.currency) ? anyData.currency : 'TJS',
     } as Prisma.ListingUncheckedCreateInput;
     
     if (baseData.sellerId) {
@@ -225,22 +249,55 @@ export async function createItem(collection: CollectionName, data: CollectionInp
     if (!baseData.id) delete baseData.id;
     return await prisma.listing.create({ data: baseData });
   } else if (collection === 'employees') {
+    const anyData = data as any;
     const baseData = {
-      ...data,
-      status: data.status || 'draft',
+      ...anyData,
+      status: anyData.status || 'draft',
     } as Prisma.EmployeeUncheckedCreateInput;
     if (!baseData.id) delete baseData.id;
     return await prisma.employee.create({ data: baseData });
   } else if (collection === 'services') {
-    const slug = normalizeSlug(String('slug' in data && data.slug ? data.slug : title), idStr);
+    const anyData = data as any;
+    const slug = normalizeSlug(String('slug' in anyData && anyData.slug ? anyData.slug : title), idStr);
     const baseData = {
-      ...data,
+      ...anyData,
       slug,
-      status: data.status || 'draft',
+      status: anyData.status || 'draft',
     } as Prisma.ServiceItemUncheckedCreateInput;
     if (!baseData.id) delete baseData.id;
     if (baseData.sortOrder !== undefined) baseData.sortOrder = Number(baseData.sortOrder);
     return await prisma.serviceItem.create({ data: baseData });
+  } else if (collection === 'applications') {
+    const anyData = data as any;
+    const baseData = { ...anyData, status: anyData.status || 'new' } as Prisma.ApplicationUncheckedCreateInput;
+    if (!baseData.id) delete baseData.id;
+    return await prisma.application.create({ data: baseData });
+
+  } else if (collection === 'users') {
+    const userData = data as any;
+    const baseData = {
+      ...userData,
+      role: userData.role || "seller",
+      email: userData.email || "",
+      phone: userData.phone || "",
+      whatsapp: userData.whatsapp || "",
+      telegram: userData.telegram || "",
+      instagram: userData.instagram || "",
+      facebook: userData.facebook || "",
+      avatar: userData.avatar || "",
+      bio: userData.bio || "",
+      specializations: userData.specializations || "",
+      rating: userData.rating || 5,
+      dealsCount: userData.dealsCount || 0,
+      experienceYears: userData.experienceYears || 0
+    } as Prisma.UserUncheckedCreateInput;
+    if (!baseData.id) delete baseData.id;
+    if (baseData.password) {
+      baseData.password = await bcrypt.hash(baseData.password, 10);
+    } else {
+      baseData.password = await bcrypt.hash("barakat123", 10); // default password
+    }
+    return await prisma.user.create({ data: baseData });
   }
 }
 
@@ -257,6 +314,17 @@ export async function updateItem(collection: CollectionName, id: string, data: C
     } else if (collection === 'services') {
       if (updateData.sortOrder !== undefined) updateData.sortOrder = Number(updateData.sortOrder);
       return await prisma.serviceItem.update({ where: { id }, data: updateData as Prisma.ServiceItemUncheckedUpdateInput });
+    } else if (collection === 'applications') {
+      return await prisma.application.update({ where: { id }, data: updateData as Prisma.ApplicationUncheckedUpdateInput });
+
+    } else if (collection === 'users') {
+      const updateUserData = { ...updateData } as Record<string, any>;
+      if (updateUserData.password && typeof updateUserData.password === "string") {
+        updateUserData.password = await bcrypt.hash(updateUserData.password, 10);
+      } else {
+        delete updateUserData.password;
+      }
+      return await prisma.user.update({ where: { id }, data: updateUserData as Prisma.UserUncheckedUpdateInput });
     }
   } catch {
     return null;
@@ -271,6 +339,11 @@ export async function deleteItem(collection: CollectionName, id: string) {
       await prisma.employee.delete({ where: { id } });
     } else if (collection === 'services') {
       await prisma.serviceItem.delete({ where: { id } });
+    } else if (collection === 'applications') {
+      await prisma.application.delete({ where: { id } });
+
+    } else if (collection === 'users') {
+      await prisma.user.delete({ where: { id } });
     }
     return true;
   } catch {

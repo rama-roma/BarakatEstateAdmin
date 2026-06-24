@@ -11,21 +11,41 @@ import {
   Search,
   Trash2,
   UserPlus,
+  MessageSquare,
+  Image as ImageIcon,
+  Users,
+  Settings,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { AuthUser, Listing, Profile, PublishStatus } from "@/lib/types";
+import type { AuthUser, Listing, Profile, PublishStatus, Application, Banner, User } from "@/lib/types";
 
-type Tab = "listings" | "profile";
+type Tab = "listings" | "profile" | "applications" | "users" | "settings";
 
 type FormState = {
   listings: Partial<Listing>;
   profile: Partial<Profile>;
+  applications: Partial<Application>;
+
+  users: Partial<AuthUser>;
+  settings: Partial<Profile>;
 };
 
-const tabs: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
-  { id: "listings", label: "Мои объявления", icon: <Building2 size={18} /> },
-  { id: "profile", label: "Мой профиль", icon: <Contact size={18} /> },
-];
+function getTabs(role: string): Array<{ id: Tab; label: string; icon: React.ReactNode }> {
+  const baseTabs = [
+    { id: "listings" as Tab, label: role === "admin" ? "Все объявления" : "Мои объявления", icon: <Building2 size={18} /> },
+  ];
+  
+  if (role === "admin") {
+    return [
+      ...baseTabs,
+      { id: "applications" as Tab, label: "Заявки", icon: <MessageSquare size={18} /> },
+      { id: "users" as Tab, label: "Пользователи", icon: <Users size={18} /> },
+      { id: "settings" as Tab, label: "Настройки сайта", icon: <Settings size={18} /> },
+    ];
+  }
+
+  return [...baseTabs, { id: "profile" as Tab, label: "Мой профиль", icon: <Contact size={18} /> }];
+}
 
 const emptyForms: FormState = {
   listings: {
@@ -44,8 +64,6 @@ const emptyForms: FormState = {
     features: "",
     latitude: 38.5598,
     longitude: 68.787,
-    mapX: 50,
-    mapY: 50,
     mainImage: "",
     gallery: "",
     isFeatured: false,
@@ -56,17 +74,23 @@ const emptyForms: FormState = {
     description: "",
     phone: "",
     email: "",
-    socials: {
-      instagram: "",
-      telegram: "",
-      whatsapp: "",
-      facebook: "",
-    },
+    socials: { instagram: "", telegram: "", whatsapp: "", facebook: "" },
     avatarUrl: "",
     specializations: "",
     rating: 5,
     dealsCount: 0,
     experienceYears: 0,
+  },
+  applications: { name: "", phone: "", service: "", message: "", status: "new" },
+
+  users: { username: "", name: "", email: "", phone: "", whatsapp: "", telegram: "", instagram: "", facebook: "", avatar: "", bio: "", rating: 5, dealsCount: 0, experienceYears: 0, specializations: "", role: "seller" },
+  settings: {
+    name: "Barakat", description: "", phone: "", email: "",
+    socials: { instagram: "", telegram: "", whatsapp: "", facebook: "" },
+    avatarUrl: "", specializations: "", rating: 5, dealsCount: 0, experienceYears: 0,
+    districts: "Центр, Исмоили Сомони, Сино, Фирдавси, Шохмансур",
+    propertyTypes: "Квартира, Вторичка, Новостройки, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната",
+    dealTypes: "sale:Продажа, rent:Аренда",
   },
 };
 
@@ -146,13 +170,15 @@ export default function UserDashboard() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("listings");
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [items, setItems] = useState<any[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formKeyCounter, setFormKeyCounter] = useState(0);
   const [form, setForm] = useState<FormState>(cloneForm(emptyForms));
   const [query, setQuery] = useState("");
   const [statusFilter] = useState("all");
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState<Partial<Profile>>(emptyForms.settings);
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -166,21 +192,28 @@ export default function UserDashboard() {
       })
       .catch(() => setCurrentUser(null))
       .finally(() => setAuthReady(true));
+      
+    fetch("/api/profile").then(res => res.ok && res.json()).then(data => {
+      if (data?.data) {
+        setGlobalSettings(data.data);
+        setForm(prev => ({ ...prev, settings: data.data }));
+      }
+    });
   }, []);
 
   const filteredItems = useMemo(() => {
-    if (activeTab === "profile") return [];
-    return listings.filter((item) => {
+    if (activeTab === "profile" || activeTab === "settings") return [];
+    return items.filter((item) => {
       const text = JSON.stringify(item).toLowerCase();
       const matchesSearch = text.includes(query.toLowerCase());
-      const matchesStatus = statusFilter === "all" || item.status === statusFilter;
+      const matchesStatus = statusFilter === "all" || item.status === statusFilter || !("status" in item);
       return matchesSearch && matchesStatus;
     });
-  }, [listings, query, statusFilter, activeTab]);
+  }, [items, query, statusFilter, activeTab]);
 
   useEffect(() => {
     if (!currentUser) return;
-    void loadAll();
+    void loadData(activeTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser]);
 
@@ -190,12 +223,13 @@ export default function UserDashboard() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  async function loadAll() {
+  async function loadData(tab: Tab) {
+    if (tab === "profile" || tab === "settings") return;
     setLoading(true);
     try {
-      const listingRes = await fetch("/api/listings?admin=1");
-      const listingPayload = await listingRes.json();
-      setListings(listingPayload.data || []);
+      const res = await fetch(`/api/${tab}?admin=1`);
+      const payload = await res.json();
+      setItems(payload.data || []);
       setForm((prev) => ({ ...prev, profile: userToProfile(currentUser!) }));
     } finally {
       setLoading(false);
@@ -205,7 +239,7 @@ export default function UserDashboard() {
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setCurrentUser(null);
-    setListings([]);
+    setItems([]);
     setEditingId(null);
     setActiveTab("listings");
     setForm(cloneForm(emptyForms));
@@ -213,9 +247,10 @@ export default function UserDashboard() {
 
   function startCreate() {
     setEditingId(null);
+    setFormKeyCounter((k) => k + 1);
     setForm((prev) => ({
       ...prev,
-      [activeTab]: activeTab === "profile" && currentUser ? userToProfile(currentUser) : cloneForm(emptyForms[activeTab]),
+      [activeTab]: activeTab === "profile" && currentUser ? userToProfile(currentUser) : activeTab === "settings" ? globalSettings : cloneForm((emptyForms as any)[activeTab]),
     }));
   }
 
@@ -224,8 +259,9 @@ export default function UserDashboard() {
     setEditingId(null);
     setForm((prev) => ({
       ...prev,
-      [tab]: tab === "profile" && currentUser ? userToProfile(currentUser) : cloneForm(emptyForms[tab]),
+      [tab]: tab === "profile" && currentUser ? userToProfile(currentUser) : tab === "settings" ? globalSettings : cloneForm((emptyForms as any)[tab]),
     }));
+    loadData(tab);
   }
 
   function startEdit(item: Listing) {
@@ -235,20 +271,20 @@ export default function UserDashboard() {
   }
 
   async function removeItem(id: string) {
-    if (!window.confirm("Удалить объявление?")) return;
-    await fetch(`/api/listings/${id}`, { method: "DELETE" });
-    await loadAll();
+    if (!window.confirm("Удалить?")) return;
+    await fetch(`/api/${activeTab}/${id}`, { method: "DELETE" });
+    await loadData(activeTab);
     setToast("Удалено");
   }
 
-  async function togglePublish(item: Listing) {
+  async function togglePublish(item: any) {
     const status: PublishStatus = item.status === "published" ? "draft" : "published";
-    await fetch(`/api/listings/${item.id}`, {
+    await fetch(`/api/${activeTab}/${item.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status }),
     });
-    await loadAll();
+    await loadData(activeTab);
     setToast(status === "published" ? "Опубликовано" : "Скрыто");
   }
 
@@ -289,8 +325,8 @@ export default function UserDashboard() {
       return;
     }
 
-    const url = editingId ? `/api/listings/${editingId}` : `/api/listings`;
-    const method = editingId ? "PATCH" : "POST";
+    const url = activeTab === "settings" ? "/api/profile" : editingId ? `/api/${activeTab}/${editingId}` : `/api/${activeTab}`;
+    const method = activeTab === "settings" ? "PUT" : editingId ? "PATCH" : "POST";
 
     const response = await fetch(url, {
       method,
@@ -305,8 +341,15 @@ export default function UserDashboard() {
       return;
     }
 
-    await loadAll();
-    startCreate();
+    if (activeTab === "settings") {
+      const json = await response.json();
+      setGlobalSettings(json.data);
+      setForm(prev => ({ ...prev, settings: json.data }));
+    } else {
+      await loadData(activeTab);
+      startCreate();
+    }
+    
     setToast("Сохранено");
     setLoading(false);
   }
@@ -328,7 +371,7 @@ export default function UserDashboard() {
           </div>
           
           <nav className="flex flex-row lg:flex-col gap-2 overflow-x-auto mt-4 lg:mt-0 pb-1 lg:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {tabs.map((tab) => (
+            {getTabs(currentUser.role).map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => switchTab(tab.id)}
@@ -361,43 +404,51 @@ export default function UserDashboard() {
           {/* TOPBAR */}
           <header className="bg-white rounded-2xl shadow-sm border border-slate-200 px-8 py-6 flex items-center justify-between">
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              {tabs.find((tab) => tab.id === activeTab)?.label}
+              {getTabs(currentUser.role).find((tab) => tab.id === activeTab)?.label}
             </h1>
           </header>
 
           {/* MAIN FORMS */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-            <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
-              <h2 className="text-xl font-semibold text-slate-800">
-                {activeTab === "profile" ? "Настройки профиля" : editingId ? "Редактирование объявления" : "Создать объявление"}
-              </h2>
-              {activeTab !== "profile" && (
-                <button 
-                  onClick={startCreate} 
-                  type="button" 
-                  className="flex items-center gap-2 text-sm font-medium text-yellow-700 hover:bg-yellow-50 px-4 py-2 rounded-lg transition"
-                >
-                  <Plus size={16} /> Новое
-                </button>
+          {!(["listings", "applications"].includes(activeTab) && !editingId && currentUser?.role === "admin") && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8">
+              {activeTab !== "settings" && activeTab !== "profile" && (
+                <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
+                  <h2 className="text-xl font-semibold text-slate-800">
+                    {activeTab === "users" ? (editingId ? "Редактировать пользователя" : "Новый пользователь") :
+                     activeTab === "applications" ? (editingId ? "Редактировать заявку" : "Создать заявку") :
+                     (editingId ? "Редактировать объявление" : "Создать объявление")}
+                  </h2>
+                  {!(["listings", "applications"].includes(activeTab) && currentUser?.role === "admin") && (
+                    <button 
+                      onClick={startCreate} 
+                      type="button" 
+                      className="flex items-center gap-2 text-sm font-medium text-yellow-700 hover:bg-yellow-50 px-4 py-2 rounded-lg transition"
+                    >
+                      <Plus size={16} /> Новое
+                    </button>
+                  )}
+                </div>
               )}
+
+              <form key={`${activeTab}-${editingId || "new"}-${formKeyCounter}`} onSubmit={submitForm}>
+                {renderForm(activeTab, form, loading, currentUser)}
+              </form>
             </div>
+          )}
 
-            <form key={`${activeTab}-${editingId || "new"}`} onSubmit={submitForm}>
-              {renderForm(activeTab, form, loading)}
-            </form>
-          </div>
-
-          {/* LISTINGS DATA GRID */}
-          {activeTab === "listings" && (
+          {/* DATA GRID */}
+          {activeTab !== "profile" && activeTab !== "settings" && (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-                <h2 className="text-xl font-semibold text-slate-800">Список объявлений</h2>
+                <h2 className="text-xl font-semibold text-slate-800">
+                  {activeTab === "listings" ? "Список объявлений" : activeTab === "applications" ? "Список заявок" : "Пользователи"}
+                </h2>
                 <div className="relative max-w-sm w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <input
                     aria-label="Поиск"
                     onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Поиск объявлений..."
+                    placeholder="Поиск..."
                     value={query}
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400/50 transition"
                   />
@@ -414,48 +465,80 @@ export default function UserDashboard() {
                   filteredItems.map((item) => (
                     <article key={item.id} className="group flex flex-col sm:flex-row bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition duration-200">
                       
-                      {/* Image Thumbnail */}
-                      <div className="w-full sm:w-64 h-48 sm:h-auto shrink-0 bg-slate-100 overflow-hidden relative">
-                        {item.mainImage ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img className="w-full h-full object-cover group-hover:scale-105 transition duration-500" src={item.mainImage} alt={item.title} />
-                        ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-slate-300">
-                            <Building2 size={32} />
-                          </div>
-                        )}
-                        <div className="absolute top-3 left-3 flex gap-2">
-                          <span className={`px-2.5 py-1 text-xs font-semibold rounded-md shadow-sm ${item.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                            {item.status === "published" ? "Опубликовано" : "Черновик"}
-                          </span>
-                          {item.isFeatured && (
-                            <span className="px-2.5 py-1 text-xs font-semibold rounded-md shadow-sm bg-yellow-100 text-yellow-700">
-                              В Избранном
-                            </span>
+                      {activeTab === "listings" && (
+                        <div className="w-full sm:w-64 h-48 sm:h-auto shrink-0 bg-slate-100 overflow-hidden relative">
+                          {item.mainImage ? (
+                            <img className="w-full h-full object-cover group-hover:scale-105 transition duration-500" src={item.mainImage} alt={item.title} />
+                          ) : (
+                            <div className="absolute inset-0 flex items-center justify-center text-slate-300">
+                              <Building2 size={32} />
+                            </div>
                           )}
+                          <div className="absolute top-3 left-3 flex gap-2">
+                            <span className={`px-2.5 py-1 text-xs font-semibold rounded-md shadow-sm ${item.status === 'published' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
+                              {item.status === "published" ? "Опубликовано" : "Черновик"}
+                            </span>
+                            {item.isFeatured && (
+                              <span className="px-2.5 py-1 text-xs font-semibold rounded-md shadow-sm bg-yellow-100 text-yellow-700">
+                                В Избранном
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
-                      {/* Content Body */}
+
+
                       <div className="flex-1 p-5 flex flex-col justify-between min-w-0">
                         <div>
-                          <h3 className="font-bold text-lg text-slate-900 truncate mb-1">{item.title}</h3>
-                          <div className="text-slate-500 text-sm font-medium mb-4 flex gap-2 items-center">
-                            <span className="text-slate-800 font-bold">{item.price} TJS</span>
-                            <span className="w-1 h-1 rounded-full bg-slate-300" />
-                            <span>{item.propertyType}</span>
-                            <span className="w-1 h-1 rounded-full bg-slate-300" />
-                            <span>{item.district}</span>
-                          </div>
+                          {activeTab === "listings" && (
+                            <>
+                              <h3 className="font-bold text-lg text-slate-900 truncate mb-1">{item.title}</h3>
+                              <div className="text-slate-500 text-sm font-medium mb-4 flex gap-2 items-center">
+                                <span className="text-slate-800 font-bold">{item.price} TJS</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                <span>{item.propertyType}</span>
+                                <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                <span>{item.district}</span>
+                              </div>
+                            </>
+                          )}
+                          
+                          {activeTab === "applications" && (
+                            <>
+                              <h3 className="font-bold text-lg text-slate-900 truncate mb-1">{item.name}</h3>
+                              <div className="text-slate-500 text-sm font-medium mb-4 flex flex-col gap-1">
+                                <span>Телефон: {item.phone}</span>
+                                <span>Услуга: {item.service}</span>
+                                {item.message && <span className="text-slate-700 italic border-l-2 border-slate-200 pl-2 my-1">Комментарий: {item.message}</span>}
+                                <span className={`w-fit px-2 py-0.5 rounded text-xs font-bold mt-1 ${item.status === 'new' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{item.status === 'new' ? 'Новая' : 'Обработана'}</span>
+                              </div>
+                            </>
+                          )}
+
+
+                          {activeTab === "users" && (
+                            <>
+                              <h3 className="font-bold text-lg text-slate-900 truncate mb-1">{item.username}</h3>
+                              <div className="text-slate-500 text-sm font-medium mb-4 flex flex-col gap-1">
+                                <span>Роль: <span className="font-bold">{item.role === 'admin' ? 'Админ' : 'Продавец'}</span></span>
+                                <span>Имя: {item.name}</span>
+                              </div>
+                            </>
+                          )}
                         </div>
                         
                         <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100">
-                          <button onClick={() => startEdit(item)} type="button" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-yellow-600 transition bg-slate-50 hover:bg-yellow-50 px-3 py-1.5 rounded-lg">
-                            <Pencil size={14} /> Редактировать
-                          </button>
-                          <button onClick={() => togglePublish(item)} type="button" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-green-600 transition bg-slate-50 hover:bg-green-50 px-3 py-1.5 rounded-lg">
-                            <CheckCircle2 size={14} /> {item.status === "published" ? "Скрыть" : "Опубликовать"}
-                          </button>
+                          {activeTab !== "applications" && (
+                            <button onClick={() => startEdit(item)} type="button" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-yellow-600 transition bg-slate-50 hover:bg-yellow-50 px-3 py-1.5 rounded-lg">
+                              <Pencil size={14} /> Редактировать
+                            </button>
+                          )}
+                          {activeTab === "listings" && (
+                            <button onClick={() => togglePublish(item)} type="button" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-green-600 transition bg-slate-50 hover:bg-green-50 px-3 py-1.5 rounded-lg">
+                              <CheckCircle2 size={14} /> {item.status === "published" ? "Скрыть" : "Опубликовать"}
+                            </button>
+                          )}
                           <button onClick={() => removeItem(item.id)} type="button" className="flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-700 transition bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg ml-auto">
                             <Trash2 size={14} /> Удалить
                           </button>
@@ -567,7 +650,7 @@ function AuthScreen({ onAuth }: { onAuth: (user: AuthUser) => void }) {
 // DATA BUILDER
 // -------------------------------------------------------------
 function buildPayload(tab: Tab, data: FormData) {
-  if (tab === "profile") {
+  if (tab === "profile" || tab === "settings") {
     return {
       name: String(data.get("name") || ""),
       bio: String(data.get("description") || ""),
@@ -581,6 +664,32 @@ function buildPayload(tab: Tab, data: FormData) {
       rating: toNumber(data.get("rating")),
       dealsCount: toNumber(data.get("dealsCount")),
       experienceYears: toNumber(data.get("experienceYears")),
+      districts: String(data.get("districts") || ""),
+      propertyTypes: String(data.get("propertyTypes") || ""),
+      dealTypes: String(data.get("dealTypes") || ""),
+    };
+  }
+
+  if (tab === "applications") {
+    return {
+      name: String(data.get("name") || ""),
+      phone: String(data.get("phone") || ""),
+      service: String(data.get("service") || ""),
+      message: String(data.get("message") || ""),
+      status: String(data.get("status") || "new"),
+    };
+  }
+
+
+
+  if (tab === "users") {
+    return {
+      username: String(data.get("username") || ""),
+      name: String(data.get("name") || ""),
+      email: String(data.get("email") || ""),
+      phone: String(data.get("phone") || ""),
+      role: String(data.get("role") || "seller"),
+      password: String(data.get("password") || ""),
     };
   }
 
@@ -615,10 +724,10 @@ function buildPayload(tab: Tab, data: FormData) {
 // -------------------------------------------------------------
 // FORM COMPONENTS
 // -------------------------------------------------------------
-function FormSection({ title, children }: { title: string; children: React.ReactNode }) {
+function FormSection({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <div className="mb-8 last:mb-0">
-      <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">{title}</h3>
+      {title && <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">{title}</h3>}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {children}
       </div>
@@ -626,7 +735,7 @@ function FormSection({ title, children }: { title: string; children: React.React
   );
 }
 
-function Field({ name, title, value, type = "text", colSpan = 1 }: { name: string; title: string; value?: string | number; type?: string; colSpan?: 1 | 2 | 3 | "full" }) {
+function Field({ name, title, value, type = "text", colSpan = 1, autoComplete }: { name: string; title: string; value?: string | number; type?: string; colSpan?: 1 | 2 | 3 | "full"; autoComplete?: string }) {
   const spanClass = colSpan === "full" ? "col-span-1 md:col-span-2 lg:col-span-3" : colSpan === 2 ? "col-span-1 md:col-span-2" : "col-span-1";
   return (
     <label className={`flex flex-col gap-1.5 ${spanClass}`}>
@@ -637,6 +746,7 @@ function Field({ name, title, value, type = "text", colSpan = 1 }: { name: strin
         name={name} 
         type={type} 
         step={type === "number" ? "any" : undefined} 
+        autoComplete={autoComplete}
       />
     </label>
   );
@@ -691,36 +801,37 @@ function FileUpload({ name, title, multiple = false, colSpan = "full" }: { name:
   );
 }
 
-function renderForm(tab: Tab, form: FormState, loading: boolean) {
+function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: AuthUser | null) {
   const values = form[tab];
 
   if (tab === "profile") {
     const item = values as Partial<Profile>;
+    const isAdmin = currentUser?.role === "admin";
+    
     return (
       <div className="flex flex-col gap-8">
         <FormSection title="Основная информация">
           <Field name="name" title="Имя" value={item.name} colSpan={2} />
-          <Field name="specializations" title="Специализация" value={item.specializations} colSpan={1} />
+          {!isAdmin && <Field name="specializations" title="Специализация" value={item.specializations} colSpan={1} />}
           
-          <FileUpload name="avatarFile" title="Загрузить новое фото / аватар" colSpan={2} />
-          <Field name="avatar" title="Или укажите URL аватара" value={item.avatarUrl} colSpan={1} />
-          
-          <TextArea name="description" title="О себе" value={item.description} rows={4} colSpan="full" />
+          {!isAdmin && (
+            <>
+              <FileUpload name="avatarFile" title="Загрузить новое фото / аватар" colSpan={2} />
+              <Field name="avatar" title="Или укажите URL аватара" value={item.avatarUrl} colSpan={1} />
+              <TextArea name="description" title="О себе" value={item.description} rows={4} colSpan="full" />
+            </>
+          )}
         </FormSection>
 
-        <FormSection title="Контакты и Соцсети">
-          <Field name="phone" title="Телефон" value={item.phone} />
-          <Field name="email" title="Email" value={item.email} />
-          <Field name="whatsapp" title="WhatsApp" value={item.socials?.whatsapp} />
-          <Field name="telegram" title="Telegram" value={item.socials?.telegram} />
-          <Field name="instagram" title="Instagram" value={item.socials?.instagram} />
-        </FormSection>
-
-        <FormSection title="Статистика (Достижения)">
-          <Field name="rating" title="Средняя оценка (0-5)" type="number" value={item.rating} />
-          <Field name="dealsCount" title="Успешные сделки" type="number" value={item.dealsCount} />
-          <Field name="experienceYears" title="Стаж работы (лет)" type="number" value={item.experienceYears} />
-        </FormSection>
+        {!isAdmin && (
+          <FormSection title="Контакты и Соцсети">
+            <Field name="phone" title="Телефон" value={item.phone} />
+            <Field name="email" title="Email" value={item.email} />
+            <Field name="whatsapp" title="WhatsApp" value={item.socials?.whatsapp} />
+            <Field name="telegram" title="Telegram" value={item.socials?.telegram} />
+            <Field name="instagram" title="Instagram" value={item.socials?.instagram} />
+          </FormSection>
+        )}
 
         <div className="flex justify-end pt-6 border-t border-slate-100">
           <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>
@@ -731,13 +842,73 @@ function renderForm(tab: Tab, form: FormState, loading: boolean) {
     );
   }
 
+  if (tab === "settings") {
+    const item = values as Partial<Profile>;
+    return (
+      <div className="flex flex-col gap-8">
+        {/* Contacts section removed as requested */}
+        <FormSection title="Справочники (Значения через запятую)">
+          <TextArea name="districts" title="Районы" value={item.districts} rows={2} />
+          <TextArea name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} rows={2} />
+          <TextArea name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} rows={2} />
+        </FormSection>
+        <div className="flex justify-end pt-6 border-t border-slate-100">
+          <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>
+            Сохранить настройки
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (tab === "users") {
+    const item = values as Partial<AuthUser>;
+    return (
+      <div className="flex flex-col gap-8">
+        <FormSection title="Пользователь">
+          <Field name="username" title="Логин" value={item.username} autoComplete="new-password" />
+          <Field name="name" title="Имя" value={item.name} autoComplete="new-password" />
+          <Field name="password" title="Пароль" value="" type="password" autoComplete="new-password" />
+          <Select name="role" title="Роль" value={item.role} options={[["seller", "Продавец"], ["admin", "Админ"]]} />
+        </FormSection>
+        <div className="flex justify-end pt-6 border-t border-slate-100">
+          <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>
+            {loading ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (tab === "applications") {
+    const item = values as Partial<Application>;
+    return (
+      <div className="flex flex-col gap-8">
+        <FormSection title="Заявка">
+          <Field name="name" title="Имя" value={item.name} />
+          <Field name="phone" title="Телефон" value={item.phone} />
+          <Field name="service" title="Услуга" value={item.service} />
+          <Select name="status" title="Статус" value={item.status} options={[["new", "Новая"], ["processed", "Обработана"]]} />
+          <TextArea name="message" title="Сообщение" value={item.message} rows={4} />
+        </FormSection>
+        <div className="flex justify-end pt-6 border-t border-slate-100">
+          <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>
+            {loading ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+
+
   const item = values as Partial<Listing>;
   return (
     <div className="flex flex-col gap-8">
       <FormSection title="Общая информация">
         <Field name="title" title="Название объявления" value={item.title} colSpan={2} />
         <Select name="dealType" title="Тип сделки" value={item.dealType} options={[["sale", "Продажа"], ["rent", "Аренда"]]} />
-        <Select name="propertyType" title="Тип недвижимости" value={item.propertyType || "Квартира"} options={[["Квартира", "Квартира"], ["Дом", "Дом"], ["Студия", "Студия"], ["Коммерческая", "Коммерческая"], ["Новостройка", "Новостройка"]]} />
+        <Select name="propertyType" title="Тип недвижимости" value={item.propertyType || "Квартира"} options={[["Квартира", "Квартира"], ["Вторичка", "Вторичка"], ["Новостройки", "Новостройки"], ["Дома", "Дома"], ["Дом", "Дом"], ["Земельные участки", "Земельные участки"], ["Коммерческая", "Коммерческая"], ["Дача", "Дача"], ["Парковка", "Парковка"], ["Комната", "Комната"]]} />
         <Field name="price" title="Цена (TJS)" type="number" value={item.price} colSpan={2} />
       </FormSection>
 
@@ -755,20 +926,15 @@ function renderForm(tab: Tab, form: FormState, loading: boolean) {
         <Select name="district" title="Район" value={item.district || ""} options={[["Центр", "Центр"], ["Исмоили Сомони", "Исмоили Сомони"], ["Сино", "Сино"], ["Фирдавси", "Фирдавси"], ["Шохмансур", "Шохмансур"]]} />
         <Field name="address" title="Адрес" value={item.address} />
         <Field name="landmark" title="Ориентир" value={item.landmark || ""} />
-        <div className="col-span-full grid grid-cols-2 lg:grid-cols-4 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
+        <div className="col-span-full grid grid-cols-2 gap-6 bg-slate-50 p-4 rounded-xl border border-slate-100">
           <Field name="latitude" title="Latitude (Широта)" type="number" value={item.latitude} />
           <Field name="longitude" title="Longitude (Долгота)" type="number" value={item.longitude} />
-          <Field name="mapX" title="Карта X (%)" type="number" value={item.mapX} />
-          <Field name="mapY" title="Карта Y (%)" type="number" value={item.mapY} />
         </div>
       </FormSection>
 
       <FormSection title="Медиа и Описание">
-        <FileUpload name="mainImageFile" title="Главное фото (Файл)" colSpan={1} />
-        <Field name="mainImage" title="Или URL главного фото" value={item.mainImage} colSpan={2} />
-        
-        <FileUpload name="galleryFiles" title="Галерея (Множественный выбор)" multiple colSpan={1} />
-        <TextArea name="gallery" title="Или URL галереи (каждый с новой строки)" value={item.gallery} rows={3} colSpan={2} />
+        <FileUpload name="mainImageFile" title="Главное фото (Файл)" colSpan="full" />
+        <FileUpload name="galleryFiles" title="Галерея (Множественный выбор)" multiple colSpan="full" />
         
         <TextArea name="features" title="Удобства (обязательно через запятую)" value={item.features} rows={2} colSpan="full" />
         <TextArea name="description" title="Детальное описание" value={item.description} rows={5} colSpan="full" />
