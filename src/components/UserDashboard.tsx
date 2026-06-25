@@ -434,7 +434,22 @@ export default function UserDashboard() {
               )}
 
               <form key={`${activeTab}-${editingId || "new"}-${formKeyCounter}`} onSubmit={submitForm}>
-                {renderForm(activeTab, form, loading, currentUser)}
+                {renderForm(activeTab, form, loading, currentUser, async (fieldName, newVal) => {
+                  const updatedSettings = { ...form.settings, [fieldName]: newVal };
+                  setForm(prev => ({ ...prev, settings: updatedSettings }));
+                  
+                  const response = await fetch("/api/profile", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(updatedSettings),
+                  });
+                  
+                  if (!response.ok) {
+                    setToast("Ошибка при сохранении");
+                  } else {
+                    setToast("Сохранено!");
+                  }
+                })}
               </form>
             </div>
           )}
@@ -968,7 +983,7 @@ function FileUpload({ name, title, multiple = false, colSpan = "full" }: { name:
   );
 }
 
-function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: AuthUser | null) {
+function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: AuthUser | null, onFieldSave?: (fieldName: string, newVal: string) => Promise<void>) {
   const values = form[tab];
 
   if (tab === "profile") {
@@ -1012,30 +1027,13 @@ function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: Au
   if (tab === "settings") {
     const item = values as Partial<Profile>;
 
-    const handleFieldSave = async (fieldName: string, newVal: string) => {
-      const updatedSettings = { ...form.settings, [fieldName]: newVal };
-      setForm(prev => ({ ...prev, settings: updatedSettings }));
-      
-      const response = await fetch("/api/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedSettings),
-      });
-      
-      if (!response.ok) {
-        setToast("Ошибка при сохранении");
-      } else {
-        setToast("Сохранено!");
-      }
-    };
-
     return (
       <div className="flex flex-col gap-8 pb-8">
         {/* Contacts section removed as requested */}
         <FormSection title="Справочники (Значения через запятую)">
-          <ListManager name="districts" title="Районы" value={item.districts} placeholder="Например: Сино" onSave={handleFieldSave} />
-          <ListManager name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} placeholder="Например: Квартира" onSave={handleFieldSave} />
-          <ListManager name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} placeholder="Например: sale:Продажа" onSave={handleFieldSave} />
+          <ListManager name="districts" title="Районы" value={item.districts} placeholder="Например: Сино" onSave={onFieldSave} />
+          <ListManager name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} placeholder="Например: Квартира" onSave={onFieldSave} />
+          <ListManager name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} placeholder="Например: sale:Продажа" onSave={onFieldSave} />
         </FormSection>
       </div>
     );
