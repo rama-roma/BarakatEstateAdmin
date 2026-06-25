@@ -1,5 +1,5 @@
 import type { CollectionName } from "./types";
-
+//
 export const collections: CollectionName[] = ["listings", "employees", "services", "applications", "users"];
 
 export function jsonResponse(data: unknown, status = 200) {
