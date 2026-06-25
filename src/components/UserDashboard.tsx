@@ -775,10 +775,11 @@ type ListItem = {
   value: string;
 };
 
-function ListManager({ name, title, value = "", colSpan = "full", placeholder = "Введите значение..." }: { name: string; title: string; value?: string; colSpan?: 1 | 2 | 3 | "full"; placeholder?: string }) {
+function ListManager({ name, title, value = "", colSpan = "full", placeholder = "Введите значение...", onSave }: { name: string; title: string; value?: string; colSpan?: 1 | 2 | 3 | "full"; placeholder?: string; onSave?: (fieldName: string, newVal: string) => Promise<void> }) {
   const [items, setItems] = useState<ListItem[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (value) {
@@ -791,21 +792,44 @@ function ListManager({ name, title, value = "", colSpan = "full", placeholder = 
     setEditValue(item.value);
   };
 
-  const saveEdit = () => {
-    if (editingId === "new") {
-      if (editValue.trim()) {
-        setItems([...items, { id: Math.random().toString(36).substring(7), value: editValue.trim() }]);
+  const handleSave = async (newItems: ListItem[], actionId: string) => {
+    const val = newItems.map(i => i.value).join(", ");
+    if (onSave) {
+      setSavingId(actionId);
+      try {
+        await onSave(name, val);
+        setItems(newItems);
+        setEditingId(null);
+        setEditValue("");
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setSavingId(null);
       }
     } else {
+      setItems(newItems);
+      setEditingId(null);
+      setEditValue("");
+    }
+  };
+
+  const saveEdit = async () => {
+    if (editingId === "new") {
       if (editValue.trim()) {
-        setItems(items.map(i => i.id === editingId ? { ...i, value: editValue.trim() } : i));
+        const newItem = { id: Math.random().toString(36).substring(7), value: editValue.trim() };
+        await handleSave([...items, newItem], "new");
       } else {
-        // Если поле пустое - удаляем
-        setItems(items.filter(i => i.id !== editingId));
+        setEditingId(null);
+      }
+    } else if (editingId) {
+      if (editValue.trim()) {
+        const newItems = items.map(i => i.id === editingId ? { ...i, value: editValue.trim() } : i);
+        await handleSave(newItems, editingId);
+      } else {
+        const newItems = items.filter(i => i.id !== editingId);
+        await handleSave(newItems, "delete-" + editingId);
       }
     }
-    setEditingId(null);
-    setEditValue("");
   };
 
   const addNew = () => {
@@ -813,8 +837,9 @@ function ListManager({ name, title, value = "", colSpan = "full", placeholder = 
     setEditValue("");
   };
 
-  const removeItem = (id: string) => {
-    setItems(items.filter(i => i.id !== id));
+  const removeItem = async (id: string) => {
+    const newItems = items.filter(i => i.id !== id);
+    await handleSave(newItems, "delete-" + id);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -850,25 +875,26 @@ function ListManager({ name, title, value = "", colSpan = "full", placeholder = 
                 <input
                   autoFocus
                   type="text"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-sm font-medium"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-sm font-medium disabled:opacity-50"
                   value={editValue}
                   onChange={(e) => setEditValue(e.target.value)}
                   onKeyDown={handleKeyDown}
                   onBlur={saveEdit}
+                  disabled={savingId === item.id}
                 />
-                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} className="w-full text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 py-2 rounded-lg hover:bg-slate-200 transition-colors mt-auto">
-                  Сохранить
+                <button type="button" disabled={savingId === item.id} onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} className="w-full text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 py-2 rounded-lg hover:bg-slate-200 transition-colors mt-auto disabled:opacity-50">
+                  {savingId === item.id ? "Загрузка..." : "Сохранить"}
                 </button>
               </div>
             ) : (
               <>
                 <span className="text-sm font-semibold text-slate-800 break-words">{item.value}</span>
                 <div className="flex flex-col gap-2 mt-auto pt-3 border-t border-slate-100">
-                  <button type="button" onClick={() => startEdit(item)} className="w-full flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 hover:text-yellow-700 hover:bg-yellow-50 hover:border-yellow-200 rounded-lg transition-colors">
+                  <button type="button" onClick={() => startEdit(item)} disabled={!!savingId} className="w-full flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 hover:text-yellow-700 hover:bg-yellow-50 hover:border-yellow-200 rounded-lg transition-colors disabled:opacity-50">
                     <Edit2 size={14} /> Изменить
                   </button>
-                  <button type="button" onClick={() => removeItem(item.id)} className="w-full flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded-lg transition-colors">
-                    <Trash2 size={14} /> Удалить
+                  <button type="button" onClick={() => removeItem(item.id)} disabled={!!savingId} className="w-full flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded-lg transition-colors disabled:opacity-50">
+                    {savingId === "delete-" + item.id ? "Удаление..." : <><Trash2 size={14} /> Удалить</>}
                   </button>
                 </div>
               </>
@@ -882,14 +908,15 @@ function ListManager({ name, title, value = "", colSpan = "full", placeholder = 
               autoFocus
               type="text"
               placeholder={placeholder}
-              className="w-full bg-white border border-yellow-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-sm font-medium"
+              className="w-full bg-white border border-yellow-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-sm font-medium disabled:opacity-50"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onBlur={saveEdit}
+              disabled={savingId === "new"}
             />
-            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} className="text-sm font-bold text-yellow-900 bg-yellow-300 border border-yellow-400 px-4 py-2 rounded-lg hover:bg-yellow-400 transition-colors">
-              Сохранить
+            <button type="button" disabled={savingId === "new"} onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} className="text-sm font-bold text-yellow-900 bg-yellow-300 border border-yellow-400 px-4 py-2 rounded-lg hover:bg-yellow-400 transition-colors disabled:opacity-50">
+              {savingId === "new" ? "Загрузка..." : "Сохранить"}
             </button>
           </div>
         )}
@@ -984,19 +1011,32 @@ function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: Au
 
   if (tab === "settings") {
     const item = values as Partial<Profile>;
+
+    const handleFieldSave = async (fieldName: string, newVal: string) => {
+      const updatedSettings = { ...form.settings, [fieldName]: newVal };
+      setForm(prev => ({ ...prev, settings: updatedSettings }));
+      
+      const response = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedSettings),
+      });
+      
+      if (!response.ok) {
+        setToast("Ошибка при сохранении");
+      } else {
+        setToast("Сохранено!");
+      }
+    };
+
     return (
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-8 pb-8">
         {/* Contacts section removed as requested */}
         <FormSection title="Справочники (Значения через запятую)">
-          <ListManager name="districts" title="Районы" value={item.districts} placeholder="Например: Сино" />
-          <ListManager name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} placeholder="Например: Квартира" />
-          <ListManager name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} placeholder="Например: sale:Продажа" />
+          <ListManager name="districts" title="Районы" value={item.districts} placeholder="Например: Сино" onSave={handleFieldSave} />
+          <ListManager name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} placeholder="Например: Квартира" onSave={handleFieldSave} />
+          <ListManager name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} placeholder="Например: sale:Продажа" onSave={handleFieldSave} />
         </FormSection>
-        <div className="flex justify-end pt-6 border-t border-slate-100">
-          <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>
-            Сохранить настройки
-          </button>
-        </div>
       </div>
     );
   }
