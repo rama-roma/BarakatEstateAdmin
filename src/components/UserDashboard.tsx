@@ -15,6 +15,9 @@ import {
   Image as ImageIcon,
   Users,
   Settings,
+  X,
+  Edit2,
+  PlusCircle,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { AuthUser, Listing, Profile, PublishStatus, Application, Banner, User } from "@/lib/types";
@@ -767,6 +770,143 @@ function TextArea({ name, title, value, rows = 3, colSpan = "full" }: { name: st
   );
 }
 
+type ListItem = {
+  id: string;
+  value: string;
+};
+
+function ListManager({ name, title, value = "", colSpan = "full", placeholder = "Введите значение..." }: { name: string; title: string; value?: string; colSpan?: 1 | 2 | 3 | "full"; placeholder?: string }) {
+  const [items, setItems] = useState<ListItem[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  useEffect(() => {
+    if (value) {
+      setItems(value.split(",").map((t: string) => ({ id: Math.random().toString(36).substring(7), value: t.trim() })).filter(i => i.value));
+    }
+  }, [value]);
+
+  const startEdit = (item: ListItem) => {
+    setEditingId(item.id);
+    setEditValue(item.value);
+  };
+
+  const saveEdit = () => {
+    if (editingId === "new") {
+      if (editValue.trim()) {
+        setItems([...items, { id: Math.random().toString(36).substring(7), value: editValue.trim() }]);
+      }
+    } else {
+      if (editValue.trim()) {
+        setItems(items.map(i => i.id === editingId ? { ...i, value: editValue.trim() } : i));
+      } else {
+        // Если поле пустое - удаляем
+        setItems(items.filter(i => i.id !== editingId));
+      }
+    }
+    setEditingId(null);
+    setEditValue("");
+  };
+
+  const addNew = () => {
+    setEditingId("new");
+    setEditValue("");
+  };
+
+  const removeItem = (id: string) => {
+    setItems(items.filter(i => i.id !== id));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      saveEdit();
+    } else if (e.key === "Escape") {
+      setEditingId(null);
+    }
+  };
+
+  const spanClass = colSpan === "full" ? "col-span-1 md:col-span-2 lg:col-span-3" : colSpan === 2 ? "col-span-1 md:col-span-2" : "col-span-1";
+
+  return (
+    <div className={`flex flex-col gap-4 ${spanClass} mb-4`}>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <span className="text-sm font-bold text-slate-700">{title}</span>
+        <button 
+          type="button" 
+          onClick={addNew}
+          disabled={editingId === "new"}
+          className="flex items-center gap-1.5 px-4 py-2 bg-yellow-400 text-yellow-950 rounded-lg text-sm font-bold hover:bg-yellow-500 transition-colors disabled:opacity-50"
+        >
+          <PlusCircle size={16} /> Добавить
+        </button>
+      </div>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        {items.map((item) => (
+          <div key={item.id} className="flex flex-col justify-between gap-3 p-4 bg-white border border-slate-200 shadow-sm rounded-xl hover:border-yellow-300 transition-colors group min-h-[120px]">
+            {editingId === item.id ? (
+              <div className="flex flex-col gap-3 w-full h-full">
+                <input
+                  autoFocus
+                  type="text"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-sm font-medium"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={saveEdit}
+                />
+                <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} className="w-full text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 py-2 rounded-lg hover:bg-slate-200 transition-colors mt-auto">
+                  Сохранить
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="text-sm font-semibold text-slate-800 break-words">{item.value}</span>
+                <div className="flex flex-col gap-2 mt-auto pt-3 border-t border-slate-100">
+                  <button type="button" onClick={() => startEdit(item)} className="w-full flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 hover:text-yellow-700 hover:bg-yellow-50 hover:border-yellow-200 rounded-lg transition-colors">
+                    <Edit2 size={14} /> Изменить
+                  </button>
+                  <button type="button" onClick={() => removeItem(item.id)} className="w-full flex items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold text-slate-500 bg-slate-50 border border-slate-200 hover:text-red-600 hover:bg-red-50 hover:border-red-200 rounded-lg transition-colors">
+                    <Trash2 size={14} /> Удалить
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+        
+        {editingId === "new" && (
+          <div className="flex flex-col gap-3 p-4 bg-yellow-50 border border-yellow-300 shadow-sm rounded-xl min-h-[120px]">
+            <input
+              autoFocus
+              type="text"
+              placeholder={placeholder}
+              className="w-full bg-white border border-yellow-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400/50 text-sm font-medium"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onBlur={saveEdit}
+            />
+            <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={saveEdit} className="text-sm font-bold text-yellow-900 bg-yellow-300 border border-yellow-400 px-4 py-2 rounded-lg hover:bg-yellow-400 transition-colors">
+              Сохранить
+            </button>
+          </div>
+        )}
+        
+        {items.length === 0 && editingId !== "new" && (
+          <div className="text-center py-8 bg-slate-50 border border-dashed border-slate-300 rounded-xl">
+            <span className="text-sm font-medium text-slate-400">Список пуст. Нажмите «Добавить», чтобы создать первую запись.</span>
+          </div>
+        )}
+      </div>
+      
+      {/* Hidden input for form submission */}
+      <input type="hidden" name={name} value={items.map(i => i.value).join(", ")} />
+    </div>
+  );
+}
+
 function Select({ name, title, value, options, colSpan = 1 }: { name: string; title: string; value?: string; options: Array<[string, string]>; colSpan?: 1 | 2 | 3 | "full" }) {
   const spanClass = colSpan === "full" ? "col-span-1 md:col-span-2 lg:col-span-3" : colSpan === 2 ? "col-span-1 md:col-span-2" : "col-span-1";
   return (
@@ -848,9 +988,9 @@ function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: Au
       <div className="flex flex-col gap-8">
         {/* Contacts section removed as requested */}
         <FormSection title="Справочники (Значения через запятую)">
-          <TextArea name="districts" title="Районы" value={item.districts} rows={2} />
-          <TextArea name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} rows={2} />
-          <TextArea name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} rows={2} />
+          <ListManager name="districts" title="Районы" value={item.districts} placeholder="Например: Сино" />
+          <ListManager name="propertyTypes" title="Типы недвижимости" value={item.propertyTypes} placeholder="Например: Квартира" />
+          <ListManager name="dealTypes" title="Типы сделок (формат value:Label)" value={item.dealTypes} placeholder="Например: sale:Продажа" />
         </FormSection>
         <div className="flex justify-end pt-6 border-t border-slate-100">
           <button className="px-8 py-3 bg-yellow-500 hover:bg-yellow-400 text-yellow-950 font-bold rounded-xl transition shadow-sm text-sm" type="submit" disabled={loading}>

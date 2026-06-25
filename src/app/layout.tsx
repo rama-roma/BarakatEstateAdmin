@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Barakat Estate",
   description: "Панель управления объявлениями Barakat Estate",
+  icons: {
+    icon: "/barakat.PNG",
+  },
 };
 
 export default function RootLayout({
