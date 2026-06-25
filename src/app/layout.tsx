@@ -13,6 +13,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ru">
+      <head>
+        <link rel="icon" href="/barakat.PNG" type="image/png" sizes="any" />
+      </head>
       <body>{children}</body>
     </html>
   );
