@@ -51,8 +51,8 @@ export async function POST(request: Request) {
     await writeFile(filepath, buffer);
 
     return jsonResponse({ url: `/uploads/${filename}` });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Upload error", error);
-    return jsonResponse({ error: "Ошибка загрузки файла" }, 500);
+    return jsonResponse({ error: `Ошибка загрузки файла: ${error.message || String(error)}` }, 500);
   }
 }
