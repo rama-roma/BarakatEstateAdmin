@@ -115,7 +115,7 @@ function toStatus(value: FormDataEntryValue | null): PublishStatus {
   return value === "published" ? "published" : "draft";
 }
 
-async function uploadFile(file: File): Promise<string | null> {
+async function uploadFile(file: File): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
   try {
@@ -123,10 +123,18 @@ async function uploadFile(file: File): Promise<string | null> {
       method: "POST",
       body: formData,
     });
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.error || `Ошибка сервера: ${res.status}`);
+    }
     const data = await res.json();
-    return data.url || null;
-  } catch {
-    return null;
+    if (!data.url) {
+      throw new Error("Сервер не вернул URL файла");
+    }
+    return data.url;
+  } catch (err: any) {
+    console.error("uploadFile error:", err);
+    throw new Error(err.message || "Ошибка при отправке файла на сервер");
   }
 }
 
@@ -134,7 +142,7 @@ async function prepareImageFields(data: FormData) {
   const mainImageFile = data.get("mainImageFile");
   if (mainImageFile instanceof File && mainImageFile.size > 0) {
     const url = await uploadFile(mainImageFile);
-    if (url) data.set("mainImage", url);
+    data.set("mainImage", url);
   }
 
   const galleryFiles = data.getAll("galleryFiles").filter((item) => item instanceof File && item.size > 0) as File[];
@@ -142,7 +150,7 @@ async function prepareImageFields(data: FormData) {
 
   for (const file of galleryFiles) {
     const url = await uploadFile(file);
-    if (url) uploadedGalleryUrls.push(url);
+    uploadedGalleryUrls.push(url);
   }
 
   const textGallery = String(data.get("gallery") || "")
@@ -296,73 +304,77 @@ export default function UserDashboard() {
     await loadData(activeTab);
     setToast(status === "published" ? "Опубликовано" : "Скрыто");
   }
-
   async function submitForm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!currentUser) return;
     setLoading(true);
 
-    const data = new FormData(event.currentTarget);
-    if (activeTab === "profile") {
-      const avatarFile = data.get("avatarFile");
-      if (avatarFile instanceof File && avatarFile.size > 0) {
-        const url = await uploadFile(avatarFile);
-        if (url) data.set("avatar", url);
+    try {
+      const data = new FormData(event.currentTarget);
+      if (activeTab === "profile") {
+        const avatarFile = data.get("avatarFile");
+        if (avatarFile instanceof File && avatarFile.size > 0) {
+          const url = await uploadFile(avatarFile);
+          data.set("avatar", url);
+        }
+      } else if (activeTab === "listings") {
+        await prepareImageFields(data);
       }
-    } else if (activeTab === "listings") {
-      await prepareImageFields(data);
-    }
 
-    const payload = buildPayload(activeTab, data);
+      const payload = buildPayload(activeTab, data);
 
-    if (activeTab === "profile") {
-      const response = await fetch("/api/auth/profile", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const profilePayload = await response.json();
-      if (!response.ok) {
-        setToast(profilePayload.error || "Профиль не сохранен");
+      if (activeTab === "profile") {
+        const response = await fetch("/api/auth/profile", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const profilePayload = await response.json();
+        if (!response.ok) {
+          setToast(profilePayload.error || "Профиль не сохранен");
+          setLoading(false);
+          return;
+        }
+        setCurrentUser(profilePayload.user);
+        setForm((prev) => ({ ...prev, profile: userToProfile(profilePayload.user) }));
+        setToast("Профиль обновлен");
         setLoading(false);
         return;
       }
-      setCurrentUser(profilePayload.user);
-      setForm((prev) => ({ ...prev, profile: userToProfile(profilePayload.user) }));
-      setToast("Профиль обновлен");
+
+      const url = activeTab === "settings" ? "/api/profile" : editingId ? `/api/${activeTab}/${editingId}` : `/api/${activeTab}`;
+      const method = activeTab === "settings" ? "PUT" : editingId ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        setToast(err.error || "Ошибка сохранения");
+        setLoading(false);
+        return;
+      }
+
+      if (activeTab === "settings") {
+        const json = await response.json();
+        setGlobalSettings(json.data);
+        setForm(prev => ({ ...prev, settings: json.data }));
+      } else {
+        await loadData(activeTab);
+        startCreate();
+      }
+      
+      setToast("Сохранено");
+    } catch (err: any) {
+      console.error(err);
+      setToast(err.message || "Ошибка при сохранении");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const url = activeTab === "settings" ? "/api/profile" : editingId ? `/api/${activeTab}/${editingId}` : `/api/${activeTab}`;
-    const method = activeTab === "settings" ? "PUT" : editingId ? "PATCH" : "POST";
-
-    const response = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const err = await response.json();
-      setToast(err.error || "Ошибка сохранения");
-      setLoading(false);
-      return;
-    }
-
-    if (activeTab === "settings") {
-      const json = await response.json();
-      setGlobalSettings(json.data);
-      setForm(prev => ({ ...prev, settings: json.data }));
-    } else {
-      await loadData(activeTab);
-      startCreate();
-    }
-    
-    setToast("Сохранено");
-    setLoading(false);
   }
-
   if (!authReady) return <main className="min-h-screen bg-slate-50" />;
   if (!currentUser) return <AuthScreen onAuth={(user) => setCurrentUser(user)} />;
 
@@ -1149,8 +1161,36 @@ function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: Au
       </FormSection>
 
       <FormSection title="Медиа и Описание">
-        <FileUpload name="mainImageFile" title="Главное фото (Файл)" colSpan="full" />
-        <FileUpload name="galleryFiles" title="Галерея (Множественный выбор)" multiple colSpan="full" />
+        <input type="hidden" name="mainImage" value={item.mainImage || ""} />
+        <input type="hidden" name="gallery" value={item.gallery || ""} />
+
+        <div className="col-span-full flex flex-col gap-2">
+          <FileUpload name="mainImageFile" title="Главное фото (Файл)" colSpan="full" />
+          {item.mainImage && (
+            <div className="mt-1">
+              <span className="text-xs font-semibold text-slate-500 block mb-1">Текущее главное фото:</span>
+              <img src={item.mainImage} alt="Текущее главное фото" className="h-24 w-auto rounded-lg object-cover border border-slate-200" />
+            </div>
+          )}
+        </div>
+
+        <div className="col-span-full flex flex-col gap-2">
+          <FileUpload name="galleryFiles" title="Галерея (Множественный выбор)" multiple colSpan="full" />
+          {item.gallery && (
+            <div className="mt-1">
+              <span className="text-xs font-semibold text-slate-500 block mb-1">Текущие фото галереи:</span>
+              <div className="flex flex-wrap gap-2">
+                {item.gallery.split("\n").map((url, i) => {
+                  const trimmedUrl = url.trim();
+                  if (!trimmedUrl) return null;
+                  return (
+                    <img key={i} src={trimmedUrl} alt={`Галерея ${i}`} className="h-16 w-auto rounded-lg object-cover border border-slate-200" />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
         
         <TextArea name="features" title="Удобства (обязательно через запятую)" value={item.features} rows={2} colSpan="full" />
         <TextArea name="description" title="Детальное описание" value={item.description} rows={5} colSpan="full" />
