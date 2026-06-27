@@ -763,6 +763,7 @@ function buildPayload(tab: Tab, data: FormData) {
     features: String(data.get("features") || ""),
     constructionStage: String(data.get("constructionStage") || ""),
     renovation: String(data.get("renovation") || ""),
+    documentType: String(data.get("documentType") || ""),
     landmark: String(data.get("landmark") || ""),
     latitude: toNumber(data.get("latitude")),
     longitude: toNumber(data.get("longitude")),
