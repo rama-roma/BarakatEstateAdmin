@@ -40,17 +40,11 @@ export async function POST(request: Request) {
       return jsonResponse({ url: uploadResponse.secure_url });
     }
 
-    // Fallback: Local upload
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
-
-    const ext = path.extname(file.name);
-    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    const filepath = path.join(uploadsDir, filename);
-
-    await writeFile(filepath, buffer);
-
-    return jsonResponse({ url: `/uploads/${filename}` });
+    // Fallback: Base64 upload (works perfectly on serverless environments like Vercel without Cloudinary)
+    const base64Data = buffer.toString("base64");
+    const dataURI = `data:${file.type};base64,${base64Data}`;
+    
+    return jsonResponse({ url: dataURI });
   } catch (error: any) {
     console.error("Upload error", error);
     return jsonResponse({ error: `Ошибка загрузки файла: ${error.message || String(error)}` }, 500);
