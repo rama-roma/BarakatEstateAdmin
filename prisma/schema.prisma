@@ -27,6 +27,7 @@ model Listing {
   features        String
   constructionStage String?
   renovation      String?
+  documentType    String?
   landmark        String?
   latitude        Float
   longitude       Float

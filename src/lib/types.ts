@@ -37,6 +37,7 @@ export type Listing = {
   features: string;
   constructionStage: string;
   renovation: string;
+  documentType: string;
   landmark: string;
   latitude: number;
   longitude: number;

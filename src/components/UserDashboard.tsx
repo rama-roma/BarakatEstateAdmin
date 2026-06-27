@@ -75,6 +75,7 @@ const emptyForms: FormState = {
     gallery: "",
     isFeatured: false,
     status: "draft",
+    documentType: "",
   },
   profile: {
     name: "",
@@ -1133,6 +1134,7 @@ function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: Au
         <Field name="totalFloors" title="Всего этажей" type="number" value={item.totalFloors} />
         <Select name="constructionStage" title="Стадия строительства" value={item.constructionStage || ""} options={[["", "Любая"], ["Построен", "Построен"], ["Строится", "Строится"], ["Котлован", "Котлован"]]} />
         <Select name="renovation" title="Ремонт" value={item.renovation || ""} options={[["", "Любая"], ["С ремонтом", "С ремонтом"], ["Без ремонта (коробка)", "Без ремонта (коробка)"], ["Евроремонт", "Евроремонт"], ["Дизайнерский", "Дизайнерский"]]} />
+        <Select name="documentType" title="Документ" value={item.documentType || ""} options={[["", "Любой"], ["Договор", "Договор"], ["Техпаспорт", "Техпаспорт"]]} />
       </FormSection>
 
       <FormSection title="Расположение">

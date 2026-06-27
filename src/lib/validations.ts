@@ -45,6 +45,7 @@ export const listingSchema = z.object({
   features: z.string().optional().or(z.literal("")),
   constructionStage: z.string().optional().or(z.literal("")),
   renovation: z.string().optional().or(z.literal("")),
+  documentType: z.string().optional().or(z.literal("")),
   landmark: z.string().optional().or(z.literal("")),
   latitude: z.number().optional().default(38.5598),
   longitude: z.number().optional().default(68.7870),
