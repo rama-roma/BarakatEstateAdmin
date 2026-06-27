@@ -18,11 +18,13 @@ import {
   X,
   Edit2,
   PlusCircle,
+  Inbox,
+  Star,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { AuthUser, Listing, Profile, PublishStatus, Application, Banner, User } from "@/lib/types";
 
-type Tab = "listings" | "profile" | "applications" | "users" | "settings";
+type Tab = "listings" | "profile" | "applications" | "users" | "settings" | "reviews";
 
 type FormState = {
   listings: Partial<Listing>;
@@ -31,6 +33,7 @@ type FormState = {
 
   users: Partial<AuthUser>;
   settings: Partial<Profile>;
+  reviews: any;
 };
 
 function getTabs(role: string): Array<{ id: Tab; label: string; icon: React.ReactNode }> {
@@ -41,7 +44,8 @@ function getTabs(role: string): Array<{ id: Tab; label: string; icon: React.Reac
   if (role === "admin") {
     return [
       ...baseTabs,
-      { id: "applications" as Tab, label: "Заявки", icon: <MessageSquare size={18} /> },
+      { id: "applications" as Tab, label: "Заявки", icon: <Inbox size={18} /> },
+      { id: "reviews" as Tab, label: "Отзывы", icon: <Star size={18} /> },
       { id: "users" as Tab, label: "Пользователи", icon: <Users size={18} /> },
       { id: "settings" as Tab, label: "Настройки сайта", icon: <Settings size={18} /> },
     ];
@@ -85,6 +89,7 @@ const emptyForms: FormState = {
     experienceYears: 0,
   },
   applications: { name: "", phone: "", service: "", message: "", status: "new" },
+  reviews: { name: "", text: "", sellerId: "", status: "pending" },
 
   users: { username: "", name: "", email: "", phone: "", whatsapp: "", telegram: "", instagram: "", facebook: "", avatar: "", bio: "", rating: 5, dealsCount: 0, experienceYears: 0, specializations: "", role: "seller" },
   settings: {
@@ -92,7 +97,7 @@ const emptyForms: FormState = {
     socials: { instagram: "", telegram: "", whatsapp: "", facebook: "" },
     avatarUrl: "", specializations: "", rating: 5, dealsCount: 0, experienceYears: 0,
     districts: "Центр, Исмоили Сомони, Сино, Фирдавси, Шохмансур",
-    propertyTypes: "Квартира, Вторичка, Новостройки, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната",
+    propertyTypes: "Квартира, Вторичка, Новостройки, Котлован, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната",
     dealTypes: "sale:Продажа, rent:Аренда",
   },
 };
@@ -412,7 +417,7 @@ export default function UserDashboard() {
           </header>
 
           {/* MAIN FORMS */}
-          {!(["listings", "applications"].includes(activeTab) && !editingId && currentUser?.role === "admin") && (
+          {activeTab !== "reviews" && !(["listings", "applications"].includes(activeTab) && !editingId && currentUser?.role === "admin") && (
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 mb-8">
               {activeTab !== "settings" && activeTab !== "profile" && (
                 <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-100">
@@ -459,7 +464,7 @@ export default function UserDashboard() {
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <h2 className="text-xl font-semibold text-slate-800">
-                  {activeTab === "listings" ? "Список объявлений" : activeTab === "applications" ? "Список заявок" : "Пользователи"}
+                  {activeTab === "listings" ? "Список объявлений" : activeTab === "applications" ? "Список заявок" : activeTab === "reviews" ? "Список отзывов" : "Пользователи"}
                 </h2>
                 <div className="relative max-w-sm w-full">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -534,8 +539,18 @@ export default function UserDashboard() {
                             </>
                           )}
 
-
-                          {activeTab === "users" && (
+                          {activeTab === "reviews" && (
+                            <>
+                              <h3 className="font-bold text-lg text-slate-900 truncate mb-1">{item.name}</h3>
+                              <div className="text-slate-500 text-sm font-medium mb-4 flex flex-col gap-1">
+                                <span className="text-slate-700 italic border-l-2 border-slate-200 pl-2 my-1">"{item.text}"</span>
+                                <span>Агент: {item.sellerId ? "ID: " + item.sellerId : "Общий"}</span>
+                                <span className={`w-fit px-2 py-0.5 rounded text-xs font-bold mt-1 ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : item.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                  {item.status === 'pending' ? 'На модерации' : item.status === 'approved' ? 'Одобрен' : 'Отклонен'}
+                                </span>
+                              </div>
+                            </>
+                          )}                          {activeTab === "users" && (
                             <>
                               <h3 className="font-bold text-lg text-slate-900 truncate mb-1">{item.username}</h3>
                               <div className="text-slate-500 text-sm font-medium mb-4 flex flex-col gap-1">
@@ -547,7 +562,7 @@ export default function UserDashboard() {
                         </div>
                         
                         <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-slate-100">
-                          {activeTab !== "applications" && (
+                          {activeTab !== "applications" && activeTab !== "reviews" && (
                             <button onClick={() => startEdit(item)} type="button" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-yellow-600 transition bg-slate-50 hover:bg-yellow-50 px-3 py-1.5 rounded-lg">
                               <Pencil size={14} /> Редактировать
                             </button>
@@ -556,6 +571,26 @@ export default function UserDashboard() {
                             <button onClick={() => togglePublish(item)} type="button" className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-green-600 transition bg-slate-50 hover:bg-green-50 px-3 py-1.5 rounded-lg">
                               <CheckCircle2 size={14} /> {item.status === "published" ? "Скрыть" : "Опубликовать"}
                             </button>
+                          )}
+                          {activeTab === "reviews" && (
+                            <div className="flex gap-2">
+                              {item.status !== "approved" && (
+                                <button onClick={async () => {
+                                  await fetch(`/api/reviews/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "approved" }) });
+                                  await loadData("reviews");
+                                }} type="button" className="flex items-center gap-2 text-sm font-medium text-green-600 hover:text-green-700 transition bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg">
+                                  <CheckCircle2 size={14} /> Одобрить
+                                </button>
+                              )}
+                              {item.status !== "rejected" && (
+                                <button onClick={async () => {
+                                  await fetch(`/api/reviews/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status: "rejected" }) });
+                                  await loadData("reviews");
+                                }} type="button" className="flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700 transition bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg">
+                                  <X size={14} /> Отклонить
+                                </button>
+                              )}
+                            </div>
                           )}
                           <button onClick={() => removeItem(item.id)} type="button" className="flex items-center gap-2 text-sm font-medium text-red-500 hover:text-red-700 transition bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg ml-auto">
                             <Trash2 size={14} /> Удалить
@@ -1086,7 +1121,7 @@ function renderForm(tab: Tab, form: FormState, loading: boolean, currentUser: Au
       <FormSection title="Общая информация">
         <Field name="title" title="Название объявления" value={item.title} colSpan={2} />
         <Select name="dealType" title="Тип сделки" value={item.dealType} options={[["sale", "Продажа"], ["rent", "Аренда"]]} />
-        <Select name="propertyType" title="Тип недвижимости" value={item.propertyType || "Квартира"} options={[["Квартира", "Квартира"], ["Вторичка", "Вторичка"], ["Новостройки", "Новостройки"], ["Дома", "Дома"], ["Дом", "Дом"], ["Земельные участки", "Земельные участки"], ["Коммерческая", "Коммерческая"], ["Дача", "Дача"], ["Парковка", "Парковка"], ["Комната", "Комната"]]} />
+        <Select name="propertyType" title="Тип недвижимости" value={item.propertyType || "Квартира"} options={[["Квартира", "Квартира"], ["Вторичка", "Вторичка"], ["Новостройки", "Новостройки"], ["Котлован", "Котлован"], ["Дома", "Дома"], ["Дом", "Дом"], ["Земельные участки", "Земельные участки"], ["Коммерческая", "Коммерческая"], ["Дача", "Дача"], ["Парковка", "Парковка"], ["Комната", "Комната"]]} />
         <Field name="price" title="Цена (TJS)" type="number" value={item.price} colSpan={2} />
       </FormSection>
 

@@ -84,6 +84,7 @@ export async function readCollection(collection: CollectionName): Promise<unknow
   if (collection === 'listings') return await prisma.listing.findMany({ orderBy: { createdAt: 'desc' } });
   if (collection === 'employees') return await prisma.employee.findMany({ orderBy: { createdAt: 'desc' } });
   if (collection === 'services') return await prisma.serviceItem.findMany({ orderBy: { sortOrder: 'asc' } });
+  if (collection === 'reviews') return await prisma.review.findMany({ orderBy: { createdAt: 'desc' } });
   return [];
 }
 
@@ -111,7 +112,7 @@ export async function readProfile(): Promise<Profile> {
         experienceYears: 1,
         specializations: '',
         districts: "Центр, Исмоили Сомони, Сино, Фирдавси, Шохмансур",
-        propertyTypes: "Квартира, Вторичка, Новостройки, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната",
+        propertyTypes: "Квартира, Вторичка, Новостройки, Котлован, Дома, Дом, Земельные участки, Коммерческая, Дача, Парковка, Комната",
         dealTypes: "sale:Продажа, rent:Аренда",
       },
     });
@@ -204,7 +205,10 @@ export async function listItems(collection: CollectionName, publicOnly = false) 
     return await prisma.application.findMany({ orderBy: { createdAt: 'desc' } });
   }
 
-
+  if (collection === 'reviews') {
+    const reviewWhere = publicOnly ? { status: 'approved' } : {};
+    return await prisma.review.findMany({ where: reviewWhere, orderBy: { createdAt: 'desc' } });
+  }
 
   if (collection === 'users') {
     const users = await prisma.user.findMany({ orderBy: { username: 'asc' } });
@@ -273,6 +277,12 @@ export async function createItem(collection: CollectionName, data: CollectionInp
     if (!baseData.id) delete baseData.id;
     return await prisma.application.create({ data: baseData });
 
+  } else if (collection === 'reviews') {
+    const anyData = data as any;
+    const baseData = { ...anyData, status: anyData.status || 'pending' } as Prisma.ReviewUncheckedCreateInput;
+    if (!baseData.id) delete baseData.id;
+    return await prisma.review.create({ data: baseData });
+
   } else if (collection === 'users') {
     const userData = data as any;
     const baseData = {
@@ -316,7 +326,8 @@ export async function updateItem(collection: CollectionName, id: string, data: C
       return await prisma.serviceItem.update({ where: { id }, data: updateData as Prisma.ServiceItemUncheckedUpdateInput });
     } else if (collection === 'applications') {
       return await prisma.application.update({ where: { id }, data: updateData as Prisma.ApplicationUncheckedUpdateInput });
-
+    } else if (collection === 'reviews') {
+      return await prisma.review.update({ where: { id }, data: updateData as Prisma.ReviewUncheckedUpdateInput });
     } else if (collection === 'users') {
       const updateUserData = { ...updateData } as Record<string, any>;
       if (updateUserData.password && typeof updateUserData.password === "string") {
@@ -341,7 +352,8 @@ export async function deleteItem(collection: CollectionName, id: string) {
       await prisma.serviceItem.delete({ where: { id } });
     } else if (collection === 'applications') {
       await prisma.application.delete({ where: { id } });
-
+    } else if (collection === 'reviews') {
+      await prisma.review.delete({ where: { id } });
     } else if (collection === 'users') {
       await prisma.user.delete({ where: { id } });
     }

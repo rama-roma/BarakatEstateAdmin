@@ -135,6 +135,16 @@ export type User = {
 
 export type AuthUser = Omit<User, "password">;
 
-export type CollectionName = "listings" | "employees" | "services" | "applications" | "users";
+export type Review = {
+  id: string;
+  name: string;
+  text: string;
+  sellerId: string | null;
+  status: "pending" | "approved" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+};
 
-export type CollectionItem = Listing | Employee | ServiceItem | Application | User;
+export type CollectionName = "listings" | "employees" | "services" | "applications" | "users" | "reviews";
+
+export type CollectionItem = Listing | Employee | ServiceItem | Application | User | Review;

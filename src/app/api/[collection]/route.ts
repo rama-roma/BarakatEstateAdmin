@@ -51,7 +51,7 @@ export async function POST(request: Request, context: CollectionContext) {
   }
 
   const session = await getSession();
-  if (!session && collection !== "applications") {
+  if (!session && collection !== "applications" && collection !== "reviews") {
     return jsonResponse({ error: "Не авторизован" }, 401);
   }
 
